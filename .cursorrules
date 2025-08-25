@@ -1,0 +1,241 @@
+# GTranslate WordPress Plugin - Cursor Rules
+
+## Project Overview
+GTranslate là một WordPress plugin chuyên nghiệp cho phép dịch website sang 103+ ngôn ngữ sử dụng Google Translate. Plugin có 800,000+ active installations và được maintain actively.
+
+## Architecture Patterns
+
+### WordPress Plugin Structure
+- Main plugin file: `gtranslate.php` (2,700+ lines)
+- Modular JavaScript: 12 separate JS modules trong `js/` directory
+- Asset management: Multiple flag sizes (16px, 24px, 32px, 48px, SVG)
+- URL addon: `url_addon/` cho paid features
+- Configuration: WordPress Options API với robust defaults
+
+### Code Organization Principles
+```php
+// WordPress hooks registration pattern
+add_action('widgets_init', array('GTranslate', 'register'));
+add_action('admin_menu', array('GTranslate', 'admin_menu'));
+add_filter('walker_nav_menu_start_el', array('GTranslate', 'render_menu_items'));
+
+// Static method pattern for all functionality
+class GTranslate extends WP_Widget {
+    public static function method_name() {
+        // Implementation
+    }
+}
+```
+
+### JavaScript Architecture
+- **Vanilla JavaScript**: No jQuery dependency for performance
+- **Modular Loading**: Load only required modules based on widget type
+- **Cross-browser**: IE9+ support với graceful degradation
+- **Performance-first**: Lazy loading và minimal DOM manipulation
+
+## Development Standards
+
+### PHP Coding Standards
+```php
+// WordPress sanitization
+$input = sanitize_text_field($_POST['input']);
+$html = wp_kses_post($_POST['html_content']);
+
+// Capability checks
+if (!current_user_can('manage_options')) {
+    wp_die('Insufficient permissions');
+}
+
+// Nonce verification
+wp_verify_nonce($_POST['nonce'], 'gtranslate_action');
+```
+
+### Configuration Management
+```php
+// Always use load_defaults pattern
+public static function load_defaults(&$data) {
+    $defaults = array(
+        'default_language' => 'en',
+        'widget_look' => 'dropdown',
+        'flag_size' => 16,
+        // ... more defaults
+    );
+    $data = wp_parse_args($data, $defaults);
+}
+```
+
+### Asset Loading Patterns
+```php
+// CDN vs Local asset logic
+$cdn_url = $data['enable_cdn'] ? 'https://cdn.gtranslate.net' : plugins_url();
+$asset_url = $cdn_url . '/path/to/asset';
+```
+
+## Performance Considerations
+
+### Critical Performance Rules
+1. **Lazy Loading**: JavaScript modules load only when needed
+2. **Asset Optimization**: Multiple image sizes for different use cases  
+3. **Caching Compatibility**: Explicit support cho major caching plugins
+4. **Minimal DOM Impact**: Efficient DOM manipulation patterns
+
+### Cache Plugin Integration
+```php
+// LiteSpeed Cache compatibility
+add_action('litespeed_cache_excludes', function($excludes) {
+    $excludes[] = 'gtranslate';
+    return $excludes;
+});
+```
+
+## Security Patterns
+
+### Input Validation
+- Always sanitize user inputs với WordPress functions
+- Use `esc_attr()`, `esc_html()`, `sanitize_text_field()`
+- Validate configuration options against allowed values
+
+### Authentication & Authorization
+- Check user capabilities before sensitive operations
+- Use WordPress nonce system for CSRF protection
+- Implement proper access controls for admin functionality
+
+## Integration Patterns
+
+### WordPress Integration Points
+1. **Widget System**: Extends WP_Widget for sidebar placement
+2. **Shortcode System**: `[gtranslate]` và `[gt-link]` shortcodes  
+3. **Menu Integration**: Automatic integration với navigation menus
+4. **Hook System**: Extensive use of WordPress actions và filters
+
+### Plugin Compatibility
+```php
+// Detect conflicting plugins
+if (is_plugin_active('wpml/sitepress.php')) {
+    // Show compatibility notice
+    add_action('admin_notices', array('GTranslate', 'wpml_notice'));
+}
+```
+
+## Translation Architecture
+
+### Free Version Flow
+```
+User clicks language → JavaScript detects → Google Translate Widget → Page translation
+```
+
+### Paid Version Flow  
+```
+User clicks language → Redirect to subdomain/subdirectory → Translation Proxy → Cached translated page
+```
+
+### Configuration Hierarchy
+1. User settings (WordPress options)
+2. Plugin defaults
+3. Backward compatibility handling
+4. Validation và sanitization
+
+## Common Patterns
+
+### Error Handling
+```javascript
+// Graceful degradation pattern
+try {
+    // Translation functionality
+} catch (error) {
+    console.warn('GTranslate error:', error);
+    // Show original content
+}
+```
+
+### Debug Mode
+```php
+// Debug logging pattern
+if (defined('WP_DEBUG') && WP_DEBUG) {
+    error_log('GTranslate: ' . $debug_message);
+}
+```
+
+### Asset Enqueuing
+```php
+// Conditional script loading
+if ($widget_look === 'dropdown') {
+    wp_enqueue_script('gtranslate-dropdown', $script_url);
+}
+```
+
+## File Organization
+
+### Core Files
+- `gtranslate.php`: Main plugin file với all PHP functionality
+- `readme.txt`: WordPress repository documentation
+- `gtranslate-notices.css`: Admin interface styling
+
+### JavaScript Modules
+- `js/base.js`: Core functionality shared across widgets
+- `js/dropdown.js`: Dropdown widget implementation
+- `js/float.js`: Floating language selector
+- `js/flags.js`: Flag-based widgets
+- `js/globe.js`: Globe widget style
+- `js/popup.js`: Popup modal implementation
+
+### Assets
+- `flags/`: Multi-size flag images (16px, 24px, 32px, 48px, SVG)
+- `gt_logo.svg`: Plugin branding
+
+### Paid Features
+- `url_addon/config.php`: Configuration for paid features
+- `url_addon/gtranslate.php`: Translation proxy implementation
+- `url_addon/gtranslate-email.php`: Email translation functionality
+
+## Best Practices
+
+### When Adding New Features
+1. Follow WordPress coding standards
+2. Maintain backward compatibility
+3. Consider performance impact
+4. Test với major themes và plugins
+5. Update documentation
+
+### When Modifying JavaScript
+1. Keep vanilla JavaScript approach
+2. Ensure cross-browser compatibility
+3. Implement graceful degradation
+4. Minimize DOM manipulation
+5. Use lazy loading when possible
+
+### When Updating Configuration
+1. Use `load_defaults()` pattern
+2. Validate all inputs
+3. Provide migration path for old settings
+4. Test with existing installations
+
+## Testing Considerations
+
+### Compatibility Testing
+- WordPress versions: 2.8.1 to latest
+- PHP versions: 5.6 to 8.2+
+- Major themes: Twenty series, popular commercial themes
+- Popular plugins: WooCommerce, Yoast SEO, caching plugins
+
+### Performance Testing
+- Page load impact measurement
+- Asset loading optimization
+- JavaScript execution time
+- Mobile performance validation
+
+## Maintenance Notes
+
+### Version Management
+- Follow semantic versioning
+- Maintain changelog trong readme.txt
+- Test thoroughly before releases
+- Consider backward compatibility impact
+
+### Support Considerations
+- Common issues documented
+- Clear error messages
+- Debug mode for troubleshooting
+- Community support forum monitoring
+
+This project represents a mature, well-architected WordPress plugin với strong emphasis on performance, compatibility, và user experience.
