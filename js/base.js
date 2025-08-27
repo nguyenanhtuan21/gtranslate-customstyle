@@ -115,7 +115,7 @@ if (document.readyState === 'loading') {
         }
         
         // PRIORITY 2: Check cookie for existing translation
-        var early_cookie_check = document.cookie.match('(^|;) ?googtrans=([^;]*)(;|$)');
+    var early_cookie_check = document.cookie.match('(^|;) ?googtrans=([^;]*)(;|$)');
         var shouldShowLoading = false;
         var detectedLang = null;
         
@@ -256,20 +256,20 @@ if (document.readyState === 'loading') {
     
     // STEP 4: Show proper loading for translation
     function waitForDOMAndShowLoading(targetLang) {
-        function showPriorityLoading() {
-            // Ensure body exists
+            function showPriorityLoading() {
+                // Ensure body exists
             if (!document.body) {
-                setTimeout(showPriorityLoading, 10);
-                return;
-            }
-            
+                    setTimeout(showPriorityLoading, 10);
+                    return;
+                }
+                
             // Remove early hide style and show body
             var hideStyle = document.getElementById('gt-early-hide-style');
             if (hideStyle) {
                 hideStyle.remove();
             }
-            document.body.style.visibility = 'visible';
-            
+                document.body.style.visibility = 'visible';
+                
             // Create proper loading overlay
             var loadingHTML = `
                 <div id="gt-early-loading">
@@ -283,9 +283,9 @@ if (document.readyState === 'loading') {
             document.body.appendChild(loadingDiv.firstElementChild);
             
             console.log('GTranslate: Priority loading displayed for language: ' + targetLang);
-            
-            // Setup monitoring to hide when translation complete
-            setTimeout(function() {
+                
+                // Setup monitoring to hide when translation complete
+                setTimeout(function() {
                 monitorTranslationProgress(targetLang);
             }, 100);
         }
@@ -300,7 +300,7 @@ if (document.readyState === 'loading') {
     
     // STEP 5: Monitor translation progress
     function monitorTranslationProgress(targetLang) {
-        var startTime = Date.now();
+                    var startTime = Date.now();
         var checkInterval = 200; // Increased interval for better stability
         var maxWaitTime = 8000; // Increased max wait time
         var minWaitTime = 1000; // Increased minimum wait time
@@ -308,18 +308,18 @@ if (document.readyState === 'loading') {
         var requiredStableChecks = 3; // Require 3 stable checks before hiding
         
         console.log('GTranslate: Starting translation monitoring for ' + targetLang);
-        
-        function checkPriorityTranslation() {
-            var currentTime = Date.now();
-            var elapsedTime = currentTime - startTime;
-            
+                    
+                    function checkPriorityTranslation() {
+                        var currentTime = Date.now();
+                        var elapsedTime = currentTime - startTime;
+                        
             // Wait minimum time before checking
             if (elapsedTime < minWaitTime) {
                 console.log('GTranslate: Waiting minimum time... ' + elapsedTime + 'ms');
-                setTimeout(checkPriorityTranslation, checkInterval);
-                return;
-            }
-            
+                            setTimeout(checkPriorityTranslation, checkInterval);
+                            return;
+                        }
+                        
             // Check if translation is complete using multiple methods
             var translationStatus = checkTranslationComplete();
             
@@ -361,44 +361,80 @@ if (document.readyState === 'loading') {
     
     // Enhanced function to check translation completion
     function checkTranslationComplete() {
-        var viewportHeight = window.innerHeight;
-        var translatedElements = document.querySelectorAll('font[style*="vertical-align: inherit"]');
-        var visibleHeight = 0;
+                        var viewportHeight = window.innerHeight;
+                        var translatedElements = document.querySelectorAll('font[style*="vertical-align: inherit"]');
+                        var visibleHeight = 0;
         var totalTextElements = document.querySelectorAll('p, h1, h2, h3, h4, h5, h6, span, div, a, li, td, th').length;
-        
+                        
         // Calculate visible translated content
-        translatedElements.forEach(function(el) {
-            var rect = el.getBoundingClientRect();
+                        translatedElements.forEach(function(el) {
+                            var rect = el.getBoundingClientRect();
             if (rect.top < viewportHeight && rect.bottom > 0) {
-                visibleHeight += Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
-            }
-        });
-        
-        // Multiple criteria for translation completion
-        var hasTranslatedElements = translatedElements.length > 0;
-        var hasSignificantContent = visibleHeight > (viewportHeight * 0.3); // At least 30% of viewport
-        var hasMinimumElements = translatedElements.length >= Math.min(5, totalTextElements * 0.1); // At least 10% of text elements or minimum 5
-        
+                                visibleHeight += Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
+                            }
+                        });
+                        
         // Check if Google Translate widget is fully loaded
         var googleTranslateLoaded = document.querySelector('.goog-te-combo') !== null;
         
-        // Additional check: look for Google Translate's characteristic elements
-        var hasGoogleTranslateMarkers = document.querySelector('font[style*="vertical-align: inherit"]') !== null;
+        // CRITICAL FIX: Detect current language to determine completion logic
+        var currentLang = 'vi'; // Default language
+        try {
+            var cookieMatch = document.cookie.match('(^|;) ?googtrans=([^;]*)(;|$)');
+            if (cookieMatch && cookieMatch[2]) {
+                var langParts = cookieMatch[2].split('/');
+                if (langParts.length >= 3) {
+                    currentLang = langParts[2];
+                }
+            }
+        } catch (e) {
+            console.log('GTranslate: Error detecting current language:', e);
+        }
         
-        var isComplete = hasTranslatedElements && 
+        var isDefaultLanguage = currentLang === 'vi' || currentLang === 'auto';
+        
+        // DIFFERENT LOGIC for default vs foreign language
+        var isComplete;
+        
+        if (isDefaultLanguage) {
+            // DEFAULT LANGUAGE: Complete when translated elements are REMOVED
+            var hasNoTranslatedElements = translatedElements.length === 0;
+            var contentVisible = document.body && document.body.style.visibility !== 'hidden';
+            
+            isComplete = googleTranslateLoaded && hasNoTranslatedElements && contentVisible;
+            
+            console.log('GTranslate: DEFAULT LANGUAGE detection - ' +
+                       'Elements: ' + translatedElements.length + 
+                       ' (should be 0), GoogleLoaded: ' + googleTranslateLoaded +
+                       ', ContentVisible: ' + contentVisible);
+        } else {
+            // FOREIGN LANGUAGE: Complete when translated elements are PRESENT
+            var hasTranslatedElements = translatedElements.length > 0;
+            var hasSignificantContent = visibleHeight > (viewportHeight * 0.3);
+            var hasMinimumElements = translatedElements.length >= Math.min(5, totalTextElements * 0.1);
+            
+            isComplete = hasTranslatedElements && 
                         hasSignificantContent && 
                         hasMinimumElements && 
-                        googleTranslateLoaded &&
-                        hasGoogleTranslateMarkers;
+                        googleTranslateLoaded;
+                        
+            console.log('GTranslate: FOREIGN LANGUAGE detection - ' +
+                       'Elements: ' + translatedElements.length + 
+                       ', Visible: ' + Math.round(visibleHeight) + 'px' +
+                       ', GoogleLoaded: ' + googleTranslateLoaded);
+        }
         
         return {
             isComplete: isComplete,
             translatedElements: translatedElements.length,
             visibleHeight: visibleHeight,
-            progress: Math.min(1, visibleHeight / (viewportHeight * 0.5)), // Progress based on 50% viewport coverage
+            progress: isDefaultLanguage ? 
+                     (translatedElements.length === 0 ? 1 : 0) : // Default: complete when no elements
+                     Math.min(1, visibleHeight / (viewportHeight * 0.5)), // Foreign: progress by coverage
             totalTextElements: totalTextElements,
             googleTranslateLoaded: googleTranslateLoaded,
-            hasGoogleTranslateMarkers: hasGoogleTranslateMarkers
+            isDefaultLanguage: isDefaultLanguage,
+            currentLang: currentLang
         };
     }
     
@@ -465,25 +501,77 @@ if (document.readyState === 'loading') {
 
 (function(){
 
-    // Force page reload on browser back/forward navigation
-    window.addEventListener('pageshow', function(event) {
-        if (event.persisted) {
-            console.log('GTranslate: Page loaded from cache - forcing reload for translation consistency');
+    // 🚀 SIMPLE FORCE RELOAD SYSTEM - Preserves Loading Logic
+    console.log('GTranslate: 🛡️ Simple force reload system activating...');
+    
+    // CRITICAL: Show loading BEFORE reload to prevent flash
+    function showLoadingBeforeReload(reason) {
+        console.log('GTranslate: 🔄 Showing loading before reload - Reason: ' + reason);
+        
+        // Immediately show loading overlay
+        var loadingHTML = '<div id="gt-reload-loading" style="position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;background:rgba(255,255,255,0.95)!important;backdrop-filter:blur(8px)!important;z-index:2147483647!important;display:flex!important;align-items:center!important;justify-content:center!important;"><div style="width:60px;height:60px;border:4px solid rgba(0,0,0,0.1);border-top:4px solid #4f46e5;border-radius:50%;animation:gt-reload-spin 1s linear infinite;"></div><style>@keyframes gt-reload-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}</style></div>';
+        document.body.insertAdjacentHTML('beforeend', loadingHTML);
+        
+        // Small delay to ensure loading is visible before reload
+        setTimeout(function() {
             location.reload();
+        }, 50);
+    }
+    
+    // Method 1: SMART reload on pageshow (with loop prevention)
+    window.addEventListener('pageshow', function(event) {
+        console.log('GTranslate: 📄 PAGESHOW event - persisted: ' + event.persisted);
+        
+        // CRITICAL: Only reload if page came from cache (persisted = true)
+        // This prevents infinite reload loops
+        if (event.persisted) {
+            console.log('GTranslate: Page from cache - reloading for translation consistency');
+            showLoadingBeforeReload('pageshow event (from cache)');
+        } else {
+            console.log('GTranslate: Fresh page load - no reload needed');
         }
     });
     
-    // Prevent browser caching for translation consistency
-    window.addEventListener('beforeunload', function() {
-        // Mark that we're navigating away
-        sessionStorage.setItem('gt_navigating', '1');
+    // Method 2: Force reload on popstate (back/forward buttons) with safeguards
+    window.addEventListener('popstate', function(event) {
+        console.log('GTranslate: ⬅️ POPSTATE event - back/forward button');
+        
+        // Safeguard: Check if we just reloaded to prevent loops
+        var lastReload = sessionStorage.getItem('gt_last_popstate_reload');
+        var currentTime = Date.now();
+        
+        if (lastReload && (currentTime - parseInt(lastReload)) < 2000) {
+            console.log('GTranslate: Recent popstate reload detected - skipping to prevent loop');
+            return;
+        }
+        
+        sessionStorage.setItem('gt_last_popstate_reload', currentTime.toString());
+        showLoadingBeforeReload('popstate event (back/forward)');
     });
     
-    // Handle popstate (back/forward button)
-    window.addEventListener('popstate', function(event) {
-        console.log('GTranslate: Browser back/forward detected - reloading page');
-        location.reload();
+    // Method 3: DISABLED hash changes (too aggressive, causes loops)
+    // window.addEventListener('hashchange', function(event) {
+    //     console.log('GTranslate: 🔗 HASHCHANGE event - DISABLED to prevent loops');
+    // });
+    
+    // Method 4: Track navigation for loading system (SIMPLIFIED)
+    window.addEventListener('beforeunload', function() {
+        console.log('GTranslate: 📤 BEFOREUNLOAD - marking navigation for loading system only');
+        // ONLY preserve for original loading system, NOT for force reload
+        sessionStorage.setItem('gt_navigating', '1');
+        // REMOVED: sessionStorage.setItem('gt_force_reload_time', Date.now().toString());
     });
+    
+    // Method 5: Clean up any problematic flags from previous versions
+    var forceReloadTime = sessionStorage.getItem('gt_force_reload_time');
+    if (forceReloadTime) {
+        console.log('GTranslate: 🧹 Cleaning up old force reload flags');
+        sessionStorage.removeItem('gt_force_reload_time');
+    }
+    
+    // NOTE: gt_navigating flag is preserved for original loading system
+    
+    console.log('GTranslate: ✅ Simple force reload system activated - Loading logic preserved');
 
     var gt = window.gtranslateSettings || {};
     gt = gt[document.currentScript.getAttribute('data-gt-widget-id')] || gt;
@@ -742,13 +830,13 @@ if (document.readyState === 'loading') {
                     }, 100);
                 };
             } else if(current_lang != default_language) {
-                // Show loading for existing translation from cookie
+            // Show loading for existing translation from cookie
                 console.log('GTranslate: Found existing translation from cookie: ' + current_lang);
-                var pageLoading = document.getElementById('gt-page-loading');
-                if(pageLoading) pageLoading.classList.add('active');
-                load_tlib();
-            } else {
-                document.querySelectorAll(u_class).forEach(function(e){e.addEventListener('pointerenter',load_tlib)});
+            var pageLoading = document.getElementById('gt-page-loading');
+            if(pageLoading) pageLoading.classList.add('active');
+            load_tlib();
+        } else {
+            document.querySelectorAll(u_class).forEach(function(e){e.addEventListener('pointerenter',load_tlib)});
                 // Mark as ready if no translation needed
                 setTimeout(function() {
                     document.body.classList.add('gtranslate-ready');

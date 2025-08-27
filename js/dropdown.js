@@ -256,26 +256,67 @@
             }
         });
         
-        // Multiple criteria for translation completion
-        var hasTranslatedElements = translatedElements.length > 0;
-        var hasSignificantContent = visibleHeight > (viewportHeight * 0.3); // At least 30% of viewport
-        var hasMinimumElements = translatedElements.length >= Math.min(5, totalTextElements * 0.1); // At least 10% of text elements or minimum 5
-        
         // Check if Google Translate widget is fully loaded
         var googleTranslateLoaded = document.querySelector('.goog-te-combo') !== null;
         
-        var isComplete = hasTranslatedElements && 
+        // CRITICAL FIX: Detect current language to determine completion logic
+        var currentLang = 'vi'; // Default language
+        try {
+            var cookieMatch = document.cookie.match('(^|;) ?googtrans=([^;]*)(;|$)');
+            if (cookieMatch && cookieMatch[2]) {
+                var langParts = cookieMatch[2].split('/');
+                if (langParts.length >= 3) {
+                    currentLang = langParts[2];
+                }
+            }
+        } catch (e) {
+            console.log('GTranslate Dropdown: Error detecting current language:', e);
+        }
+        
+        var isDefaultLanguage = currentLang === 'vi' || currentLang === 'auto';
+        
+        // DIFFERENT LOGIC for default vs foreign language
+        var isComplete;
+        
+        if (isDefaultLanguage) {
+            // DEFAULT LANGUAGE: Complete when translated elements are REMOVED
+            var hasNoTranslatedElements = translatedElements.length === 0;
+            var contentVisible = document.body && document.body.style.visibility !== 'hidden';
+            
+            isComplete = googleTranslateLoaded && hasNoTranslatedElements && contentVisible;
+            
+            console.log('GTranslate Dropdown: DEFAULT LANGUAGE detection - ' +
+                       'Elements: ' + translatedElements.length + 
+                       ' (should be 0), GoogleLoaded: ' + googleTranslateLoaded +
+                       ', ContentVisible: ' + contentVisible);
+        } else {
+            // FOREIGN LANGUAGE: Complete when translated elements are PRESENT
+            var hasTranslatedElements = translatedElements.length > 0;
+            var hasSignificantContent = visibleHeight > (viewportHeight * 0.3);
+            var hasMinimumElements = translatedElements.length >= Math.min(5, totalTextElements * 0.1);
+            
+            isComplete = hasTranslatedElements && 
                         hasSignificantContent && 
                         hasMinimumElements && 
                         googleTranslateLoaded;
+                        
+            console.log('GTranslate Dropdown: FOREIGN LANGUAGE detection - ' +
+                       'Elements: ' + translatedElements.length + 
+                       ', Visible: ' + Math.round(visibleHeight) + 'px' +
+                       ', GoogleLoaded: ' + googleTranslateLoaded);
+        }
         
         return {
             isComplete: isComplete,
             translatedElements: translatedElements.length,
             visibleHeight: visibleHeight,
-            progress: Math.min(1, visibleHeight / (viewportHeight * 0.5)),
+            progress: isDefaultLanguage ? 
+                     (translatedElements.length === 0 ? 1 : 0) : // Default: complete when no elements
+                     Math.min(1, visibleHeight / (viewportHeight * 0.5)), // Foreign: progress by coverage
             totalTextElements: totalTextElements,
-            googleTranslateLoaded: googleTranslateLoaded
+            googleTranslateLoaded: googleTranslateLoaded,
+            isDefaultLanguage: isDefaultLanguage,
+            currentLang: currentLang
         };
     }
     
@@ -285,25 +326,77 @@
 
 (function(){
 
-    // Force page reload on browser back/forward navigation
-    window.addEventListener('pageshow', function(event) {
-        if (event.persisted) {
-            console.log('GTranslate: Page loaded from cache - forcing reload for translation consistency');
+    // 🚀 SIMPLE FORCE RELOAD SYSTEM - Preserves Loading Logic (Dropdown)
+    console.log('GTranslate Dropdown: 🛡️ Simple force reload system activating...');
+    
+    // CRITICAL: Show loading BEFORE reload to prevent flash
+    function showDropdownLoadingBeforeReload(reason) {
+        console.log('GTranslate Dropdown: 🔄 Showing loading before reload - Reason: ' + reason);
+        
+        // Immediately show loading overlay
+        var loadingHTML = '<div id="gt-dropdown-reload-loading" style="position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;background:rgba(255,255,255,0.95)!important;backdrop-filter:blur(8px)!important;z-index:2147483647!important;display:flex!important;align-items:center!important;justify-content:center!important;"><div style="width:60px;height:60px;border:4px solid rgba(0,0,0,0.1);border-top:4px solid #4f46e5;border-radius:50%;animation:gt-dropdown-reload-spin 1s linear infinite;"></div><style>@keyframes gt-dropdown-reload-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}</style></div>';
+        document.body.insertAdjacentHTML('beforeend', loadingHTML);
+        
+        // Small delay to ensure loading is visible before reload
+        setTimeout(function() {
             location.reload();
+        }, 50);
+    }
+    
+    // Method 1: SMART reload on pageshow (with loop prevention)
+    window.addEventListener('pageshow', function(event) {
+        console.log('GTranslate Dropdown: 📄 PAGESHOW event - persisted: ' + event.persisted);
+        
+        // CRITICAL: Only reload if page came from cache (persisted = true)
+        // This prevents infinite reload loops
+        if (event.persisted) {
+            console.log('GTranslate Dropdown: Page from cache - reloading for translation consistency');
+            showDropdownLoadingBeforeReload('pageshow event (from cache)');
+        } else {
+            console.log('GTranslate Dropdown: Fresh page load - no reload needed');
         }
     });
     
-    // Prevent browser caching for translation consistency
-    window.addEventListener('beforeunload', function() {
-        // Mark that we're navigating away
-        sessionStorage.setItem('gt_navigating', '1');
+    // Method 2: Force reload on popstate (back/forward buttons) with safeguards
+    window.addEventListener('popstate', function(event) {
+        console.log('GTranslate Dropdown: ⬅️ POPSTATE event - back/forward button');
+        
+        // Safeguard: Check if we just reloaded to prevent loops
+        var lastReload = sessionStorage.getItem('gt_dropdown_last_popstate_reload');
+        var currentTime = Date.now();
+        
+        if (lastReload && (currentTime - parseInt(lastReload)) < 2000) {
+            console.log('GTranslate Dropdown: Recent popstate reload detected - skipping to prevent loop');
+            return;
+        }
+        
+        sessionStorage.setItem('gt_dropdown_last_popstate_reload', currentTime.toString());
+        showDropdownLoadingBeforeReload('popstate event (back/forward)');
     });
     
-    // Handle popstate (back/forward button)
-    window.addEventListener('popstate', function(event) {
-        console.log('GTranslate: Browser back/forward detected - reloading page');
-        location.reload();
+    // Method 3: DISABLED hash changes (too aggressive, causes loops)
+    // window.addEventListener('hashchange', function(event) {
+    //     console.log('GTranslate Dropdown: 🔗 HASHCHANGE event - DISABLED to prevent loops');
+    // });
+    
+    // Method 4: Track navigation for loading system (SIMPLIFIED)
+    window.addEventListener('beforeunload', function() {
+        console.log('GTranslate Dropdown: 📤 BEFOREUNLOAD - marking navigation for loading system only');
+        // ONLY preserve for original loading system, NOT for force reload
+        sessionStorage.setItem('gt_navigating', '1');
+        // REMOVED: sessionStorage.setItem('gt_dropdown_force_reload_time', Date.now().toString());
     });
+    
+    // Method 5: Clean up any problematic flags from previous versions
+    var dropdownForceReloadTime = sessionStorage.getItem('gt_dropdown_force_reload_time');
+    if (dropdownForceReloadTime) {
+        console.log('GTranslate Dropdown: 🧹 Cleaning up old force reload flags');
+        sessionStorage.removeItem('gt_dropdown_force_reload_time');
+    }
+    
+    // NOTE: gt_navigating flag is preserved for original loading system
+    
+    console.log('GTranslate Dropdown: ✅ Simple force reload system activated - Loading logic preserved');
 
     var gt = window.gtranslateSettings || {};
     gt = gt[document.currentScript.getAttribute('data-gt-widget-id')] || gt;
