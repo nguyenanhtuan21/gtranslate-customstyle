@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GTranslate Navigation Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            line-height: 1.6;
+        }
+        .test-section {
+            background: #f5f5f5;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .test-links {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        .test-links a {
+            padding: 10px 20px;
+            background: #007cba;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+        .test-links a:hover {
+            background: #005a87;
+        }
+        .gtranslate_wrapper {
+            margin: 20px 0;
+            padding: 15px;
+            background: #e7f3ff;
+            border-radius: 6px;
+        }
+        .status-indicator {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 10px;
+            background: #333;
+            color: white;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1000000;
+        }
+    </style>
+</head>
+<body>
+    <div class="status-indicator" id="statusIndicator">
+        Status: Loading...
+    </div>
+
+    <h1>GTranslate Navigation Test Page</h1>
+    
+    <div class="test-section">
+        <h2>Language Selector</h2>
+        <div class="gtranslate_wrapper">
+            <a href="#" data-gt-lang="vi" class="gt-current-lang">🇻🇳 Tiếng Việt</a>
+            <a href="#" data-gt-lang="en">🇺🇸 English</a>
+            <a href="#" data-gt-lang="ja">🇯🇵 日本語</a>
+            <a href="#" data-gt-lang="ko">🇰🇷 한국어</a>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Navigation Links</h2>
+        <p>Các link này sẽ test navigation flow khi đã dịch sang ngôn ngữ khác:</p>
+        <div class="test-links">
+            <a href="/test-page-1">Test Page 1</a>
+            <a href="/test-page-2">Test Page 2</a>
+            <a href="/dang-nhap">Đăng nhập</a>
+            <a href="/san-pham">Sản phẩm</a>
+            <a href="/lien-he">Liên hệ</a>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Content</h2>
+        <p>Đây là nội dung tiếng Việt để test việc dịch. Khi bạn chọn ngôn ngữ khác, nội dung này sẽ được dịch tự động.</p>
+        
+        <h3>Hướng dẫn test:</h3>
+        <ol>
+            <li>Click chọn "English" từ language selector</li>
+            <li>Đợi trang được dịch sang tiếng Anh</li>
+            <li>Click vào một trong các "Test Navigation Links"</li>
+            <li>Quan sát xem có bị flash về tiếng Việt không</li>
+            <li>Kiểm tra xem trang mới có giữ được ngôn ngữ đã chọn không</li>
+        </ol>
+
+        <h3>Expected Behavior (Sau khi fix):</h3>
+        <ul>
+            <li>✅ Smooth loading transition khi chuyển trang</li>
+            <li>✅ Không bị flash về ngôn ngữ mặc định</li>
+            <li>✅ Giữ được ngôn ngữ đã chọn trên trang mới</li>
+            <li>✅ Navigation progress indicator hiển thị</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>Debug Information</h2>
+        <div id="debugInfo">
+            <p><strong>Current Language:</strong> <span id="currentLang">-</span></p>
+            <p><strong>Cookie Value:</strong> <span id="cookieValue">-</span></p>
+            <p><strong>Navigation State:</strong> <span id="navState">-</span></p>
+            <p><strong>Translation Status:</strong> <span id="transStatus">-</span></p>
+        </div>
+    </div>
+
+    <!-- GTranslate Plugin Script -->
+    <script>
+        // Mock gtranslateSettings for testing
+        window.gtranslateSettings = {
+            default_language: 'vi',
+            languages: ['vi', 'en', 'ja', 'ko'],
+            url_structure: 'none',
+            native_language_names: false,
+            detect_browser_language: false,
+            wrapper_selector: '.gtranslate_wrapper'
+        };
+
+        // Debug information updater
+        function updateDebugInfo() {
+            var googtrans_matches = document.cookie.match('(^|;) ?googtrans=([^;]*)(;|$)');
+            var currentLang = googtrans_matches && googtrans_matches[2].split('/')[2] || 'vi';
+            
+            document.getElementById('currentLang').textContent = currentLang;
+            document.getElementById('cookieValue').textContent = googtrans_matches ? googtrans_matches[2] : 'None';
+            document.getElementById('navState').textContent = document.body.classList.contains('gt-navigating') ? 'Navigating' : 'Ready';
+            document.getElementById('transStatus').textContent = document.body.classList.contains('gtranslate-ready') ? 'Ready' : 'Loading';
+            
+            // Update status indicator
+            var status = 'Ready';
+            if (document.body.classList.contains('gt-navigating')) status = 'Navigating';
+            else if (!document.body.classList.contains('gtranslate-ready')) status = 'Loading';
+            document.getElementById('statusIndicator').textContent = 'Status: ' + status;
+        }
+
+        // Update debug info every 500ms
+        setInterval(updateDebugInfo, 500);
+        
+        // Log navigation events
+        document.addEventListener('click', function(e) {
+            var link = e.target.closest('a');
+            if (link && !link.hasAttribute('data-gt-lang')) {
+                console.log('Navigation click detected:', link.href);
+            }
+        });
+
+        // Log translation events
+        window.addEventListener('load', function() {
+            console.log('Page loaded, initializing GTranslate test...');
+            updateDebugInfo();
+        });
+    </script>
+</body>
+</html>
