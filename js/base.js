@@ -1,99 +1,466 @@
 // CRITICAL: Execute IMMEDIATELY to prevent FOUC - before any other script
+
+// BACKUP PLAN: Inject critical CSS IMMEDIATELY via document.write (fastest possible)
+if (document.readyState === 'loading') {
+    document.write('<style id="gt-critical-hide">html,body{visibility:hidden!important;overflow:hidden!important}#gt-emergency-loading{position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;background:rgba(255,255,255,0.98)!important;z-index:2147483647!important;display:flex!important;align-items:center!important;justify-content:center!important;visibility:visible!important}.gt-emergency-spinner{width:50px!important;height:50px!important;border:3px solid rgba(0,0,0,0.1)!important;border-top:3px solid #4f46e5!important;border-radius:50%!important;animation:gt-emergency-spin 1s linear infinite!important}@keyframes gt-emergency-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}</style><div id="gt-emergency-loading"><div class="gt-emergency-spinner"></div></div>');
+}
+
 (function(){
-    // Check cookie FIRST - before anything renders
-    var early_cookie_check = document.cookie.match('(^|;) ?googtrans=([^;]*)(;|$)');
-    if(early_cookie_check && early_cookie_check[2] && early_cookie_check[2] !== '/auto/auto') {
-        var early_lang = early_cookie_check[2].split('/')[2];
-        var early_default = 'vi'; // Default language - adjust if needed
+    'use strict';
+    
+    // ALWAYS show loading first, then decide based on cookie
+    var early_default = 'vi'; // Default language - adjust if needed
+    
+    // STEP 1: IMMEDIATELY hide content and show loading
+    function injectEarlyLoading() {
+        // CRITICAL: Inject CSS to hide content IMMEDIATELY
+        var hideStyle = document.createElement('style');
+        hideStyle.id = 'gt-early-hide-style';
+        hideStyle.textContent = `
+            html, body { 
+                visibility: hidden !important; 
+                overflow: hidden !important;
+            }
+            #gt-early-loading {
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                background: rgba(255, 255, 255, 0.98) !important;
+                backdrop-filter: blur(10px) !important;
+                -webkit-backdrop-filter: blur(10px) !important;
+                z-index: 2147483647 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+            .gt-early-spinner {
+                width: 60px !important;
+                height: 60px !important;
+                border: 4px solid rgba(0,0,0,0.1) !important;
+                border-top: 4px solid #4f46e5 !important;
+                border-radius: 50% !important;
+                animation: gt-early-spin 1s linear infinite !important;
+                position: relative !important;
+            }
+            .gt-early-spinner::after {
+                content: "" !important;
+                position: absolute !important;
+                top: -4px !important;
+                left: -4px !important;
+                right: -4px !important;
+                bottom: -4px !important;
+                border: 2px solid transparent !important;
+                border-top: 2px solid rgba(79,70,229,0.3) !important;
+                border-radius: 50% !important;
+                animation: gt-early-spin-reverse 1.5s linear infinite !important;
+            }
+            @keyframes gt-early-spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            @keyframes gt-early-spin-reverse {
+                0% { transform: rotate(360deg); }
+                100% { transform: rotate(0deg); }
+            }
+        `;
+        document.head.appendChild(hideStyle);
         
-        if(early_lang && early_lang !== early_default) {
-            // IMMEDIATELY hide body to prevent FOUC
-            if(document.body) {
-                document.body.style.visibility = 'hidden';
-            } else {
-                // If body doesn't exist yet, inject CSS to hide it
-                var hideStyle = document.createElement('style');
-                hideStyle.textContent = 'body{visibility:hidden!important}';
-                document.head.appendChild(hideStyle);
-            }
-            
-            console.log('GTranslate: CRITICAL - Body hidden to prevent FOUC, cookie: ' + early_lang);
-            
-            // Wait for DOM ready then show loading
-            function showPriorityLoading() {
-                // Ensure body exists
-                if(!document.body) {
-                    setTimeout(showPriorityLoading, 10);
-                    return;
-                }
-                
-                // Restore body visibility and show loading
-                document.body.style.visibility = 'visible';
-                
-                // Inject CSS and HTML immediately - highest priority
-                var early_style = document.createElement('style');
-                early_style.textContent = '#gt-priority-loading{position:fixed!important;top:0!important;left:0!important;width:100%!important;height:100%!important;background:rgba(255,255,255,0.98)!important;backdrop-filter:blur(10px)!important;-webkit-backdrop-filter:blur(10px)!important;z-index:999999999!important;display:flex!important;align-items:center!important;justify-content:center!important}.gt-priority-spinner{width:60px!important;height:60px!important;border:4px solid rgba(0,0,0,0.1)!important;border-top:4px solid #4f46e5!important;border-radius:50%!important;animation:gt-priority-spin 1s linear infinite!important;position:relative!important}.gt-priority-spinner::after{content:""!important;position:absolute!important;top:-4px!important;left:-4px!important;right:-4px!important;bottom:-4px!important;border:2px solid transparent!important;border-top:2px solid rgba(79,70,229,0.3)!important;border-radius:50%!important;animation:gt-priority-spin-reverse 1.5s linear infinite!important}@keyframes gt-priority-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}@keyframes gt-priority-spin-reverse{0%{transform:rotate(360deg)}100%{transform:rotate(0deg)}}';
-                document.head.appendChild(early_style);
-                
-                var early_loading = document.createElement('div');
-                early_loading.id = 'gt-priority-loading';
-                early_loading.innerHTML = '<div class="gt-priority-spinner"></div>';
-                document.body.appendChild(early_loading);
-                
-                console.log('GTranslate: Priority loading displayed for cookie: ' + early_lang);
-                
-                // Setup monitoring to hide when translation complete
-                setTimeout(function() {
-                    var startTime = Date.now();
-                    var checkInterval = 100;
-                    var maxWaitTime = 3000; // Slightly longer for cookie translations
-                    var minWaitTime = 500;
-                    var contentThreshold = window.innerHeight * 1.2;
-                    
-                    function checkPriorityTranslation() {
-                        var currentTime = Date.now();
-                        var elapsedTime = currentTime - startTime;
-                        
-                        if(elapsedTime < minWaitTime) {
-                            setTimeout(checkPriorityTranslation, checkInterval);
-                            return;
+        // IMMEDIATELY create and inject loading HTML
+        var loadingHTML = '<div id="gt-early-loading"><div class="gt-early-spinner"></div></div>';
+        
+        // Inject loading HTML IMMEDIATELY - even before body exists
+        if (document.body) {
+            document.body.insertAdjacentHTML('afterbegin', loadingHTML);
+        } else {
+            // If body doesn't exist yet, inject as soon as it does
+            var observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.type === 'childList') {
+                        var body = document.querySelector('body');
+                        if (body && !document.getElementById('gt-early-loading')) {
+                            body.insertAdjacentHTML('afterbegin', loadingHTML);
+                            observer.disconnect();
                         }
-                        
-                        var viewportHeight = window.innerHeight;
-                        var translatedElements = document.querySelectorAll('font[style*="vertical-align: inherit"]');
-                        var visibleHeight = 0;
-                        
-                        translatedElements.forEach(function(el) {
-                            var rect = el.getBoundingClientRect();
-                            if(rect.top < viewportHeight && rect.bottom > 0) {
-                                visibleHeight += Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
-                            }
-                        });
-                        
-                        if(visibleHeight >= contentThreshold || elapsedTime >= maxWaitTime) {
-                            var priorityLoading = document.getElementById('gt-priority-loading');
-                            if(priorityLoading) {
-                                priorityLoading.remove();
-                                console.log('GTranslate: Priority loading hidden after ' + elapsedTime + 'ms, content: ' + Math.round(visibleHeight) + 'px');
-                            }
-                            return;
-                        }
-                        
-                        setTimeout(checkPriorityTranslation, checkInterval);
                     }
-                    
-                    setTimeout(checkPriorityTranslation, checkInterval);
-                }, 200);
+                });
+            });
+            observer.observe(document.documentElement, { childList: true, subtree: true });
+            
+            // Fallback: Try again after tiny delay
+            setTimeout(function() {
+                if (document.body && !document.getElementById('gt-early-loading')) {
+                    document.body.insertAdjacentHTML('afterbegin', loadingHTML);
+                }
+            }, 1);
+        }
+        
+        console.log('GTranslate: CRITICAL - Early loading injected IMMEDIATELY');
+    }
+    
+    // STEP 2: Check cookie and sessionStorage to decide what to do
+    function checkCookieAndDecide() {
+        // PRIORITY 1: Check if we're navigating from translated page
+        var preserveLang = sessionStorage.getItem('gt_preserve_lang');
+        var wasNavigating = sessionStorage.getItem('gt_navigating_from_translated');
+        
+        if (preserveLang && wasNavigating) {
+            console.log('GTranslate: Navigation detected - preserving language: ' + preserveLang);
+            // Keep loading active for navigation restoration
+            waitForDOMAndShowLoading(preserveLang);
+            return;
+        }
+        
+        // PRIORITY 2: Check cookie for existing translation
+        var early_cookie_check = document.cookie.match('(^|;) ?googtrans=([^;]*)(;|$)');
+        var shouldShowLoading = false;
+        var detectedLang = null;
+        
+        console.log('GTranslate: Checking cookie...', document.cookie);
+        
+        if (early_cookie_check && early_cookie_check[2] && early_cookie_check[2] !== '/auto/auto') {
+            detectedLang = early_cookie_check[2].split('/')[2];
+            
+            // Only show loading if language is different from default
+            if (detectedLang && detectedLang !== early_default) {
+                shouldShowLoading = true;
+                console.log('GTranslate: Cookie detected with language: ' + detectedLang + ' (different from default: ' + early_default + ')');
+            } else {
+                console.log('GTranslate: Cookie detected but language is default: ' + detectedLang);
+            }
+        } else {
+            console.log('GTranslate: No translation cookie found');
+        }
+        
+        if (!shouldShowLoading) {
+            // No need for loading - hide ALL loading and show content immediately
+            console.log('GTranslate: No loading needed - hiding all loading elements');
+            hideAllLoading();
+            return;
+        }
+        
+        // Need loading - wait for DOM then show proper loading
+        console.log('GTranslate: Loading needed - continuing with translation');
+        waitForDOMAndShowLoading(detectedLang);
+    }
+    
+    // NEW: Function to hide ALL loading elements (including header-injected)
+    function hideAllLoading() {
+        console.log('GTranslate: hideAllLoading called');
+        
+        // Try multiple times to find header-injected elements (they might not be ready yet)
+        var attempts = 0;
+        var maxAttempts = 10;
+        
+        function tryHideHeaderLoading() {
+            attempts++;
+            console.log('GTranslate: Attempt ' + attempts + ' to find header elements');
+            
+            // Remove header-injected loading FIRST
+            var instantLoading = document.getElementById('gt-instant-loading');
+            var instantHide = document.getElementById('gt-instant-hide');
+            
+            console.log('GTranslate: Found elements - loading:', !!instantLoading, 'hide:', !!instantHide);
+            
+            if (instantLoading) {
+                instantLoading.style.opacity = '0';
+                instantLoading.style.transition = 'opacity 0.3s ease';
+                setTimeout(function() {
+                    if (instantLoading.parentNode) {
+                        instantLoading.parentNode.removeChild(instantLoading);
+                    }
+                }, 300);
+                console.log('GTranslate: Removed header-injected loading element');
             }
             
-            // Execute immediately or wait for DOM
-            if(document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', showPriorityLoading);
-            } else {
-                showPriorityLoading();
+            if (instantHide) {
+                instantHide.remove();
+                console.log('GTranslate: Removed header-injected hide style');
             }
+            
+            // If we found elements or reached max attempts, stop trying
+            if ((instantLoading || instantHide) || attempts >= maxAttempts) {
+                console.log('GTranslate: Finished hiding header elements after ' + attempts + ' attempts');
+                // Also call the original hideEarlyLoading for other elements
+                hideEarlyLoading();
+                return;
+            }
+            
+            // Try again after a short delay
+            setTimeout(tryHideHeaderLoading, 10);
+        }
+        
+        // Start trying immediately
+        tryHideHeaderLoading();
+    }
+    
+    // STEP 3: Hide early loading and show content
+    function hideEarlyLoading() {
+        // Remove all hide styles (including header-injected ones)
+        var hideStyle = document.getElementById('gt-early-hide-style');
+        if (hideStyle) {
+            hideStyle.remove();
+        }
+        
+        var criticalHide = document.getElementById('gt-critical-hide');
+        if (criticalHide) {
+            criticalHide.remove();
+        }
+        
+        // IMPORTANT: Also check for header-injected loading
+        var instantHide = document.getElementById('gt-instant-hide');
+        if (instantHide) {
+            instantHide.remove();
+            console.log('GTranslate: Removed header-injected hide style');
+        }
+        
+        // Show html and body
+        if (document.documentElement) {
+            document.documentElement.style.visibility = 'visible';
+            document.documentElement.style.overflow = '';
+        }
+        if (document.body) {
+            document.body.style.visibility = 'visible';
+            document.body.style.overflow = '';
+        }
+        
+        // Remove all loading elements (including header-injected ones)
+        var earlyLoading = document.getElementById('gt-early-loading');
+        if (earlyLoading) {
+            earlyLoading.remove();
+        }
+        
+        var emergencyLoading = document.getElementById('gt-emergency-loading');
+        if (emergencyLoading) {
+            emergencyLoading.remove();
+        }
+        
+        // IMPORTANT: Also check for header-injected loading
+        var instantLoading = document.getElementById('gt-instant-loading');
+        if (instantLoading) {
+            instantLoading.style.opacity = '0';
+            instantLoading.style.transition = 'opacity 0.3s ease';
+            setTimeout(function() {
+                if (instantLoading.parentNode) {
+                    instantLoading.parentNode.removeChild(instantLoading);
+                }
+            }, 300);
+            console.log('GTranslate: Removed header-injected loading element');
+        }
+        
+        console.log('GTranslate: Early loading hidden - showing content');
+    }
+    
+    // STEP 4: Show proper loading for translation
+    function waitForDOMAndShowLoading(targetLang) {
+        function showPriorityLoading() {
+            // Ensure body exists
+            if (!document.body) {
+                setTimeout(showPriorityLoading, 10);
+                return;
+            }
+            
+            // Remove early hide style and show body
+            var hideStyle = document.getElementById('gt-early-hide-style');
+            if (hideStyle) {
+                hideStyle.remove();
+            }
+            document.body.style.visibility = 'visible';
+            
+            // Create proper loading overlay
+            var loadingHTML = `
+                <div id="gt-early-loading">
+                    <div class="gt-early-spinner"></div>
+                </div>
+            `;
+            
+            // Add loading HTML to body
+            var loadingDiv = document.createElement('div');
+            loadingDiv.innerHTML = loadingHTML;
+            document.body.appendChild(loadingDiv.firstElementChild);
+            
+            console.log('GTranslate: Priority loading displayed for language: ' + targetLang);
+            
+            // Setup monitoring to hide when translation complete
+            setTimeout(function() {
+                monitorTranslationProgress(targetLang);
+            }, 100);
+        }
+        
+        // Execute immediately or wait for DOM
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', showPriorityLoading);
+        } else {
+            showPriorityLoading();
         }
     }
+    
+    // STEP 5: Monitor translation progress
+    function monitorTranslationProgress(targetLang) {
+        var startTime = Date.now();
+        var checkInterval = 200; // Increased interval for better stability
+        var maxWaitTime = 8000; // Increased max wait time
+        var minWaitTime = 1000; // Increased minimum wait time
+        var stableCheckCount = 0; // Count stable translation checks
+        var requiredStableChecks = 3; // Require 3 stable checks before hiding
+        
+        console.log('GTranslate: Starting translation monitoring for ' + targetLang);
+        
+        function checkPriorityTranslation() {
+            var currentTime = Date.now();
+            var elapsedTime = currentTime - startTime;
+            
+            // Wait minimum time before checking
+            if (elapsedTime < minWaitTime) {
+                console.log('GTranslate: Waiting minimum time... ' + elapsedTime + 'ms');
+                setTimeout(checkPriorityTranslation, checkInterval);
+                return;
+            }
+            
+            // Check if translation is complete using multiple methods
+            var translationStatus = checkTranslationComplete();
+            
+            console.log('GTranslate: Translation check - ' + 
+                'Elements: ' + translationStatus.translatedElements + 
+                ', Visible: ' + Math.round(translationStatus.visibleHeight) + 'px' +
+                ', Progress: ' + Math.round(translationStatus.progress * 100) + '%' +
+                ', Time: ' + elapsedTime + 'ms');
+            
+            if (translationStatus.isComplete) {
+                stableCheckCount++;
+                console.log('GTranslate: Translation appears complete (' + stableCheckCount + '/' + requiredStableChecks + ')');
+                
+                if (stableCheckCount >= requiredStableChecks) {
+                    // Translation is stable and complete
+                    hideTranslationLoading();
+                    console.log('GTranslate: Translation confirmed complete for ' + targetLang + ' in ' + elapsedTime + 'ms');
+                    return;
+                }
+            } else {
+                // Reset stable count if translation not complete
+                stableCheckCount = 0;
+            }
+            
+            // Timeout check
+            if (elapsedTime >= maxWaitTime) {
+                console.log('GTranslate: Translation timeout reached (' + maxWaitTime + 'ms) - hiding loading');
+                hideTranslationLoading();
+                return;
+            }
+            
+            // Continue monitoring
+            setTimeout(checkPriorityTranslation, checkInterval);
+        }
+        
+        // Start monitoring
+        setTimeout(checkPriorityTranslation, checkInterval);
+    }
+    
+    // Enhanced function to check translation completion
+    function checkTranslationComplete() {
+        var viewportHeight = window.innerHeight;
+        var translatedElements = document.querySelectorAll('font[style*="vertical-align: inherit"]');
+        var visibleHeight = 0;
+        var totalTextElements = document.querySelectorAll('p, h1, h2, h3, h4, h5, h6, span, div, a, li, td, th').length;
+        
+        // Calculate visible translated content
+        translatedElements.forEach(function(el) {
+            var rect = el.getBoundingClientRect();
+            if (rect.top < viewportHeight && rect.bottom > 0) {
+                visibleHeight += Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
+            }
+        });
+        
+        // Multiple criteria for translation completion
+        var hasTranslatedElements = translatedElements.length > 0;
+        var hasSignificantContent = visibleHeight > (viewportHeight * 0.3); // At least 30% of viewport
+        var hasMinimumElements = translatedElements.length >= Math.min(5, totalTextElements * 0.1); // At least 10% of text elements or minimum 5
+        
+        // Check if Google Translate widget is fully loaded
+        var googleTranslateLoaded = document.querySelector('.goog-te-combo') !== null;
+        
+        // Additional check: look for Google Translate's characteristic elements
+        var hasGoogleTranslateMarkers = document.querySelector('font[style*="vertical-align: inherit"]') !== null;
+        
+        var isComplete = hasTranslatedElements && 
+                        hasSignificantContent && 
+                        hasMinimumElements && 
+                        googleTranslateLoaded &&
+                        hasGoogleTranslateMarkers;
+        
+        return {
+            isComplete: isComplete,
+            translatedElements: translatedElements.length,
+            visibleHeight: visibleHeight,
+            progress: Math.min(1, visibleHeight / (viewportHeight * 0.5)), // Progress based on 50% viewport coverage
+            totalTextElements: totalTextElements,
+            googleTranslateLoaded: googleTranslateLoaded,
+            hasGoogleTranslateMarkers: hasGoogleTranslateMarkers
+        };
+    }
+    
+    // Keep old function for backward compatibility
+    function getVisibleTranslatedContent() {
+        return checkTranslationComplete().visibleHeight;
+    }
+    
+    // Hide translation loading
+    function hideTranslationLoading() {
+        var earlyLoading = document.getElementById('gt-early-loading');
+        if (earlyLoading) {
+            earlyLoading.style.opacity = '0';
+            earlyLoading.style.transition = 'opacity 0.3s ease';
+            setTimeout(function() {
+                if (earlyLoading.parentNode) {
+                    earlyLoading.parentNode.removeChild(earlyLoading);
+                }
+            }, 300);
+        }
+        
+        // Also check for header-injected loading
+        var instantLoading = document.getElementById('gt-instant-loading');
+        if (instantLoading) {
+            instantLoading.style.opacity = '0';
+            instantLoading.style.transition = 'opacity 0.3s ease';
+            setTimeout(function() {
+                if (instantLoading.parentNode) {
+                    instantLoading.parentNode.removeChild(instantLoading);
+                }
+            }, 300);
+            console.log('GTranslate: Translation complete - removed header-injected loading');
+        }
+        
+        // Remove hide styles
+        var instantHide = document.getElementById('gt-instant-hide');
+        if (instantHide) {
+            instantHide.remove();
+        }
+        
+        // Show content
+        if (document.documentElement) {
+            document.documentElement.style.visibility = 'visible';
+            document.documentElement.style.overflow = '';
+        }
+        if (document.body) {
+            document.body.style.visibility = 'visible';
+            document.body.style.overflow = '';
+        }
+    }
+    
+    // CRITICAL: Execute IMMEDIATELY - no delays
+    injectEarlyLoading();
+    
+    // Also inject loading via direct DOM manipulation for maximum speed
+    if (document.documentElement) {
+        document.documentElement.style.visibility = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+    }
+    
+    // Check cookie immediately - no delay
+    checkCookieAndDecide();
 })();
 
 (function(){
@@ -182,8 +549,11 @@
     // Navigation loading indicator
     widget_css += ".gt-nav-indicator{position:fixed;top:0;left:0;width:100%;height:3px;background:linear-gradient(90deg,transparent,#4f46e5,transparent);z-index:999998;display:none;animation:gt-nav-progress 1.5s ease-in-out infinite}.gt-navigating .gt-nav-indicator{display:block}";
     
+    // Instant loading spinner for navigation (same style as header loading)
+    widget_css += ".gt-instant-spinner{width:60px!important;height:60px!important;border:4px solid rgba(0,0,0,0.1)!important;border-top:4px solid #4f46e5!important;border-radius:50%!important;animation:gt-instant-spin 1s linear infinite!important;position:relative!important}.gt-instant-spinner::after{content:''!important;position:absolute!important;top:-4px!important;left:-4px!important;right:-4px!important;bottom:-4px!important;border:2px solid transparent!important;border-top:2px solid rgba(79,70,229,0.3)!important;border-radius:50%!important;animation:gt-instant-spin-reverse 1.5s linear infinite!important}.gt-loading-text{position:absolute!important;bottom:-50px!important;left:50%!important;transform:translateX(-50%)!important;color:#666!important;font-size:14px!important;font-weight:500!important;white-space:nowrap!important}";
+    
     // Keyframe animations
-    widget_css += "@keyframes gt-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}@keyframes gt-spin-reverse{0%{transform:rotate(360deg)}100%{transform:rotate(0deg)}}@keyframes gt-nav-progress{0%{transform:translateX(-100%)}50%{transform:translateX(0%)}100%{transform:translateX(100%)}}";
+    widget_css += "@keyframes gt-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}@keyframes gt-spin-reverse{0%{transform:rotate(360deg)}100%{transform:rotate(0deg)}}@keyframes gt-nav-progress{0%{transform:translateX(-100%)}50%{transform:translateX(0%)}100%{transform:translateX(100%)}}@keyframes gt-instant-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}@keyframes gt-instant-spin-reverse{0%{transform:rotate(360deg)}100%{transform:rotate(0deg)}}";
 
     var current_lang = document.querySelector('html').getAttribute('lang')||default_language;
     
@@ -258,9 +628,9 @@
         function fire_event(element,event){try{if(document.createEventObject){var evt=document.createEventObject();element.fireEvent('on'+event,evt)}else{var evt=document.createEvent('HTMLEvents');evt.initEvent(event,true,true);element.dispatchEvent(evt)}}catch(e){}}
         function load_tlib(){if(!window.gt_translate_script){window.gt_translate_script=document.createElement('script');gt_translate_script.src='https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit2';document.body.appendChild(gt_translate_script);}}
         
-        function startContentMonitoring(){var pageLoading=document.getElementById('gt-page-loading');if(!pageLoading)return;var startTime=Date.now();var checkInterval=100;var maxWaitTime=2000;var minWaitTime=500;var contentThreshold=window.innerHeight*1.2;function checkTranslationProgress(){var currentTime=Date.now();var elapsedTime=currentTime-startTime;if(elapsedTime<minWaitTime){setTimeout(checkTranslationProgress,checkInterval);return}var visibleContent=getVisibleTranslatedContent();if(visibleContent>=contentThreshold||elapsedTime>=maxWaitTime){hideLoadingWithTransition();return}setTimeout(checkTranslationProgress,checkInterval)}setTimeout(checkTranslationProgress,checkInterval)}
+        function startContentMonitoring(){var pageLoading=document.getElementById('gt-page-loading');if(!pageLoading)return;var startTime=Date.now();var checkInterval=200;var maxWaitTime=8000;var minWaitTime=1000;var stableCheckCount=0;var requiredStableChecks=3;function checkTranslationProgress(){var currentTime=Date.now();var elapsedTime=currentTime-startTime;if(elapsedTime<minWaitTime){setTimeout(checkTranslationProgress,checkInterval);return}var translationStatus=checkTranslationComplete();console.log('GTranslate: Content monitoring - Elements:'+translationStatus.translatedElements+', Progress:'+Math.round(translationStatus.progress*100)+'%, Time:'+elapsedTime+'ms');if(translationStatus.isComplete){stableCheckCount++;if(stableCheckCount>=requiredStableChecks){hideLoadingWithTransition();return}}else{stableCheckCount=0}if(elapsedTime>=maxWaitTime){hideLoadingWithTransition();return}setTimeout(checkTranslationProgress,checkInterval)}setTimeout(checkTranslationProgress,checkInterval)}
         
-        function hideLoadingWithTransition(){var pageLoading=document.getElementById('gt-page-loading');if(pageLoading){pageLoading.classList.add('hiding');setTimeout(function(){pageLoading.classList.remove('active','hiding');document.body.classList.add('gtranslate-ready');document.body.classList.remove('gt-navigating')},300)}}
+        function hideLoadingWithTransition(){var pageLoading=document.getElementById('gt-page-loading');if(pageLoading){pageLoading.classList.add('hiding');setTimeout(function(){pageLoading.classList.remove('active','hiding');document.body.classList.add('gtranslate-ready');document.body.classList.remove('gt-navigating')},300)}var instantLoading=document.getElementById('gt-instant-loading');if(instantLoading){instantLoading.style.opacity='0';instantLoading.style.transition='opacity 0.3s ease';setTimeout(function(){if(instantLoading.parentNode){instantLoading.parentNode.removeChild(instantLoading)}},300)}var instantHide=document.getElementById('gt-instant-hide');if(instantHide){instantHide.remove()}if(document.documentElement){document.documentElement.style.visibility='visible';document.documentElement.style.overflow=''}if(document.body){document.body.style.visibility='visible';document.body.style.overflow=''}}
         
         function getVisibleTranslatedContent(){var viewportHeight=window.innerHeight;var translatedElements=document.querySelectorAll('font[style*="vertical-align: inherit"]');var visibleHeight=0;translatedElements.forEach(function(el){var rect=el.getBoundingClientRect();if(rect.top<viewportHeight&&rect.bottom>0){visibleHeight+=Math.min(rect.bottom,viewportHeight)-Math.max(rect.top,0)}});return visibleHeight}
         
@@ -291,9 +661,17 @@
                     if(current_translated_lang && current_translated_lang !== default_language) {
                         e.preventDefault();
                         
-                        console.log('GTranslate: Intercepting navigation to maintain translation state');
+                        console.log('GTranslate: Intercepting navigation to maintain translation state: ' + current_translated_lang);
                         
-                        // Show loading immediately
+                        // Show header loading immediately to prevent FOUC
+                        var instantLoading = document.getElementById('gt-instant-loading');
+                        if (!instantLoading) {
+                            // Create instant loading if not exists
+                            var loadingHTML = '<div id="gt-instant-loading"><div style="position: relative;"><div class="gt-instant-spinner"></div><div class="gt-loading-text">Đang chuyển trang...</div></div></div>';
+                            document.body.insertAdjacentHTML('afterbegin', loadingHTML);
+                        }
+                        
+                        // Show regular loading
                         var pageLoading = document.getElementById('gt-page-loading');
                         if(pageLoading) {
                             pageLoading.classList.add('active');
@@ -303,9 +681,12 @@
                         document.body.classList.add('gt-navigating');
                         document.body.classList.remove('gtranslate-ready');
                         
-                        // Store current language for next page
+                        // CRITICAL: Store current language AND cookie for next page
                         sessionStorage.setItem('gt_preserve_lang', current_translated_lang);
                         sessionStorage.setItem('gt_navigating_from_translated', '1');
+                        sessionStorage.setItem('gt_preserve_cookie', document.cookie);
+                        
+                        console.log('GTranslate: Stored navigation data - Lang: ' + current_translated_lang + ', Cookie: ' + document.cookie);
                         
                         // Navigate after short delay to show loading
                         setTimeout(function() {
@@ -320,13 +701,27 @@
         function initializeTranslatedPage() {
             var preserveLang = sessionStorage.getItem('gt_preserve_lang');
             var wasNavigating = sessionStorage.getItem('gt_navigating_from_translated');
+            var preserveCookie = sessionStorage.getItem('gt_preserve_cookie');
             
             if(preserveLang && wasNavigating) {
                 console.log('GTranslate: Restoring translation state after navigation: ' + preserveLang);
+                console.log('GTranslate: Preserved cookie: ' + preserveCookie);
+                
+                // CRITICAL: Restore cookie first if it was lost
+                if (preserveCookie && !document.cookie.includes('googtrans')) {
+                    console.log('GTranslate: Cookie lost during navigation - restoring...');
+                    // Extract googtrans cookie from preserved cookie string
+                    var cookieMatch = preserveCookie.match(/googtrans=([^;]*)/);
+                    if (cookieMatch) {
+                        document.cookie = 'googtrans=' + cookieMatch[1] + '; path=/';
+                        console.log('GTranslate: Cookie restored: googtrans=' + cookieMatch[1]);
+                    }
+                }
                 
                 // Clear session flags
                 sessionStorage.removeItem('gt_preserve_lang');
                 sessionStorage.removeItem('gt_navigating_from_translated');
+                sessionStorage.removeItem('gt_preserve_cookie');
                 
                 // Ensure loading is shown
                 var pageLoading = document.getElementById('gt-page-loading');
@@ -334,10 +729,11 @@
                     pageLoading.classList.add('active');
                 }
                 
-                // Apply translation
+                // Apply translation immediately
                 load_tlib();
                 window.gt_translate_script.onload = function() {
                     setTimeout(function() {
+                        console.log('GTranslate: Applying preserved translation: ' + default_language + '|' + preserveLang);
                         doGTranslate(default_language + '|' + preserveLang);
                         
                         // Update language selector UI
@@ -347,6 +743,7 @@
                 };
             } else if(current_lang != default_language) {
                 // Show loading for existing translation from cookie
+                console.log('GTranslate: Found existing translation from cookie: ' + current_lang);
                 var pageLoading = document.getElementById('gt-page-loading');
                 if(pageLoading) pageLoading.classList.add('active');
                 load_tlib();

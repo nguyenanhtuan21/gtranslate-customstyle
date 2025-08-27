@@ -2,11 +2,15 @@
 (function(){
     // Check cookie FIRST - before anything renders
     var early_cookie_check = document.cookie.match('(^|;) ?googtrans=([^;]*)(;|$)');
+    var early_default = 'vi'; // Default language - adjust if needed
+    
+    console.log('GTranslate Dropdown: Checking cookie...', document.cookie);
+    
     if(early_cookie_check && early_cookie_check[2] && early_cookie_check[2] !== '/auto/auto') {
         var early_lang = early_cookie_check[2].split('/')[2];
-        var early_default = 'vi'; // Default language - adjust if needed
         
         if(early_lang && early_lang !== early_default) {
+            console.log('GTranslate Dropdown: Cookie detected with foreign language: ' + early_lang);
             // IMMEDIATELY hide body to prevent FOUC
             if(document.body) {
                 document.body.style.visibility = 'hidden';
@@ -45,37 +49,114 @@
                 // Setup monitoring to hide when translation complete
                 setTimeout(function() {
                     var startTime = Date.now();
-                    var checkInterval = 100;
-                    var maxWaitTime = 3000; // Slightly longer for cookie translations
-                    var minWaitTime = 500;
-                    var contentThreshold = window.innerHeight * 1.2;
+                    var checkInterval = 200; // Increased interval for better stability
+                    var maxWaitTime = 8000; // Increased max wait time
+                    var minWaitTime = 1000; // Increased minimum wait time
+                    var stableCheckCount = 0; // Count stable translation checks
+                    var requiredStableChecks = 3; // Require 3 stable checks before hiding
                     
                     function checkPriorityTranslation() {
                         var currentTime = Date.now();
                         var elapsedTime = currentTime - startTime;
                         
                         if(elapsedTime < minWaitTime) {
+                            console.log('GTranslate Dropdown: Waiting minimum time... ' + elapsedTime + 'ms');
                             setTimeout(checkPriorityTranslation, checkInterval);
                             return;
                         }
                         
-                        var viewportHeight = window.innerHeight;
-                        var translatedElements = document.querySelectorAll('font[style*="vertical-align: inherit"]');
-                        var visibleHeight = 0;
+                        // Enhanced translation completion check
+                        var translationStatus = window.checkDropdownTranslationComplete ? window.checkDropdownTranslationComplete() : {isComplete: false, translatedElements: 0, progress: 0};
                         
-                        translatedElements.forEach(function(el) {
-                            var rect = el.getBoundingClientRect();
-                            if(rect.top < viewportHeight && rect.bottom > 0) {
-                                visibleHeight += Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
-                            }
-                        });
+                        console.log('GTranslate Dropdown: Translation check - ' + 
+                            'Elements: ' + translationStatus.translatedElements + 
+                            ', Progress: ' + Math.round(translationStatus.progress * 100) + '%' +
+                            ', Time: ' + elapsedTime + 'ms');
                         
-                        if(visibleHeight >= contentThreshold || elapsedTime >= maxWaitTime) {
+                        if (translationStatus.isComplete) {
+                            stableCheckCount++;
+                            console.log('GTranslate Dropdown: Translation appears complete (' + stableCheckCount + '/' + requiredStableChecks + ')');
+                            
+                            if (stableCheckCount >= requiredStableChecks) {
                             var priorityLoading = document.getElementById('gt-priority-loading');
                             if(priorityLoading) {
                                 priorityLoading.remove();
-                                console.log('GTranslate: Priority loading hidden after ' + elapsedTime + 'ms, content: ' + Math.round(visibleHeight) + 'px');
+                                console.log('GTranslate: Priority loading hidden after ' + elapsedTime + 'ms, elements: ' + translationStatus.translatedElements);
                             }
+                            
+                            // Also check for header-injected loading
+                            var instantLoading = document.getElementById('gt-instant-loading');
+                            if (instantLoading) {
+                                instantLoading.style.opacity = '0';
+                                instantLoading.style.transition = 'opacity 0.3s ease';
+                                setTimeout(function() {
+                                    if (instantLoading.parentNode) {
+                                        instantLoading.parentNode.removeChild(instantLoading);
+                                    }
+                                }, 300);
+                                console.log('GTranslate: Removed header-injected loading element');
+                            }
+                            
+                            // Remove hide styles
+                            var instantHide = document.getElementById('gt-instant-hide');
+                            if (instantHide) {
+                                instantHide.remove();
+                            }
+                            
+                            // Show content
+                            if (document.documentElement) {
+                                document.documentElement.style.visibility = 'visible';
+                                document.documentElement.style.overflow = '';
+                            }
+                            if (document.body) {
+                                document.body.style.visibility = 'visible';
+                                document.body.style.overflow = '';
+                            }
+                            
+                                return;
+                            }
+                        } else {
+                            // Reset stable count if translation not complete
+                            stableCheckCount = 0;
+                        }
+                        
+                        // Timeout check
+                        if (elapsedTime >= maxWaitTime) {
+                            console.log('GTranslate Dropdown: Translation timeout reached (' + maxWaitTime + 'ms) - hiding loading');
+                            var priorityLoading = document.getElementById('gt-priority-loading');
+                            if(priorityLoading) {
+                                priorityLoading.remove();
+                                console.log('GTranslate: Priority loading hidden after timeout ' + elapsedTime + 'ms');
+                            }
+                            
+                            // Also check for header-injected loading
+                            var instantLoading = document.getElementById('gt-instant-loading');
+                            if (instantLoading) {
+                                instantLoading.style.opacity = '0';
+                                instantLoading.style.transition = 'opacity 0.3s ease';
+                                setTimeout(function() {
+                                    if (instantLoading.parentNode) {
+                                        instantLoading.parentNode.removeChild(instantLoading);
+                                    }
+                                }, 300);
+                            }
+                            
+                            // Remove hide styles
+                            var instantHide = document.getElementById('gt-instant-hide');
+                            if (instantHide) {
+                                instantHide.remove();
+                            }
+                            
+                            // Show content
+                            if (document.documentElement) {
+                                document.documentElement.style.visibility = 'visible';
+                                document.documentElement.style.overflow = '';
+                            }
+                            if (document.body) {
+                                document.body.style.visibility = 'visible';
+                                document.body.style.overflow = '';
+                            }
+                            
                             return;
                         }
                         
@@ -92,8 +173,114 @@
             } else {
                 showPriorityLoading();
             }
+        } else {
+            console.log('GTranslate Dropdown: Cookie detected but language is default: ' + early_lang);
+            // Hide header-injected loading since no translation needed
+            hideHeaderLoading();
         }
+    } else {
+        console.log('GTranslate Dropdown: No translation cookie found');
+        // Hide header-injected loading since no translation needed
+        hideHeaderLoading();
     }
+    
+    // Function to hide header-injected loading when no translation needed
+    function hideHeaderLoading() {
+        console.log('GTranslate Dropdown: hideHeaderLoading called');
+        
+        // Try multiple times to find header-injected elements
+        var attempts = 0;
+        var maxAttempts = 10;
+        
+        function tryHideElements() {
+            attempts++;
+            console.log('GTranslate Dropdown: Attempt ' + attempts + ' to find header elements');
+            
+            var instantLoading = document.getElementById('gt-instant-loading');
+            var instantHide = document.getElementById('gt-instant-hide');
+            
+            console.log('GTranslate Dropdown: Found elements - loading:', !!instantLoading, 'hide:', !!instantHide);
+            
+            if (instantLoading) {
+                instantLoading.style.opacity = '0';
+                instantLoading.style.transition = 'opacity 0.3s ease';
+                setTimeout(function() {
+                    if (instantLoading.parentNode) {
+                        instantLoading.parentNode.removeChild(instantLoading);
+                    }
+                }, 300);
+                console.log('GTranslate Dropdown: Removed header-injected loading (no translation needed)');
+            }
+            
+            if (instantHide) {
+                instantHide.remove();
+                console.log('GTranslate Dropdown: Removed header-injected hide style');
+            }
+            
+            // Show content
+            if (document.documentElement) {
+                document.documentElement.style.visibility = 'visible';
+                document.documentElement.style.overflow = '';
+            }
+            if (document.body) {
+                document.body.style.visibility = 'visible';
+                document.body.style.overflow = '';
+            }
+            
+            // If we found elements or reached max attempts, stop trying
+            if ((instantLoading || instantHide) || attempts >= maxAttempts) {
+                console.log('GTranslate Dropdown: Finished hiding header elements after ' + attempts + ' attempts');
+                return;
+            }
+            
+            // Try again after a short delay
+            setTimeout(tryHideElements, 10);
+        }
+        
+        // Start trying after a tiny delay to let DOM settle
+        setTimeout(tryHideElements, 10);
+    }
+    
+    // Enhanced function to check translation completion for dropdown
+    function checkDropdownTranslationComplete() {
+        var viewportHeight = window.innerHeight;
+        var translatedElements = document.querySelectorAll('font[style*="vertical-align: inherit"]');
+        var visibleHeight = 0;
+        var totalTextElements = document.querySelectorAll('p, h1, h2, h3, h4, h5, h6, span, div, a, li, td, th').length;
+        
+        // Calculate visible translated content
+        translatedElements.forEach(function(el) {
+            var rect = el.getBoundingClientRect();
+            if (rect.top < viewportHeight && rect.bottom > 0) {
+                visibleHeight += Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
+            }
+        });
+        
+        // Multiple criteria for translation completion
+        var hasTranslatedElements = translatedElements.length > 0;
+        var hasSignificantContent = visibleHeight > (viewportHeight * 0.3); // At least 30% of viewport
+        var hasMinimumElements = translatedElements.length >= Math.min(5, totalTextElements * 0.1); // At least 10% of text elements or minimum 5
+        
+        // Check if Google Translate widget is fully loaded
+        var googleTranslateLoaded = document.querySelector('.goog-te-combo') !== null;
+        
+        var isComplete = hasTranslatedElements && 
+                        hasSignificantContent && 
+                        hasMinimumElements && 
+                        googleTranslateLoaded;
+        
+        return {
+            isComplete: isComplete,
+            translatedElements: translatedElements.length,
+            visibleHeight: visibleHeight,
+            progress: Math.min(1, visibleHeight / (viewportHeight * 0.5)),
+            totalTextElements: totalTextElements,
+            googleTranslateLoaded: googleTranslateLoaded
+        };
+    }
+    
+    // Make function globally accessible for other parts of the script
+    window.checkDropdownTranslationComplete = checkDropdownTranslationComplete;
 })();
 
 (function(){
@@ -233,7 +420,7 @@
         function get_current_lang() {var keyValue = document.cookie.match('(^|;) ?googtrans=([^;]*)(;|$)');return keyValue ? keyValue[2].split('/')[2] : null;}
         function fire_event(element,event){try{if(document.createEventObject){var evt=document.createEventObject();element.fireEvent('on'+event,evt)}else{var evt=document.createEvent('HTMLEvents');evt.initEvent(event,true,true);element.dispatchEvent(evt)}}catch(e){}}
         function load_tlib(){if(!window.gt_translate_script){window.gt_translate_script=document.createElement('script');gt_translate_script.src='https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit2';document.body.appendChild(gt_translate_script);}}
-        function startContentMonitoring(){var pageLoading=document.getElementById('gt-page-loading');if(!pageLoading)return;var startTime=Date.now();var checkInterval=100;var maxWaitTime=2000;var minWaitTime=500;var contentThreshold=window.innerHeight*1.2;function checkTranslationProgress(){var currentTime=Date.now();var elapsedTime=currentTime-startTime;if(elapsedTime<minWaitTime){setTimeout(checkTranslationProgress,checkInterval);return}var visibleContent=getVisibleTranslatedContent();if(visibleContent>=contentThreshold||elapsedTime>=maxWaitTime){pageLoading.classList.remove('active');return}setTimeout(checkTranslationProgress,checkInterval)}setTimeout(checkTranslationProgress,checkInterval)}
+        function startContentMonitoring(){var pageLoading=document.getElementById('gt-page-loading');if(!pageLoading)return;var startTime=Date.now();var checkInterval=200;var maxWaitTime=8000;var minWaitTime=1000;var stableCheckCount=0;var requiredStableChecks=3;function checkTranslationProgress(){var currentTime=Date.now();var elapsedTime=currentTime-startTime;if(elapsedTime<minWaitTime){setTimeout(checkTranslationProgress,checkInterval);return}var translationStatus=window.checkDropdownTranslationComplete();console.log('GTranslate Dropdown: Content monitoring - Elements:'+translationStatus.translatedElements+', Progress:'+Math.round(translationStatus.progress*100)+'%, Time:'+elapsedTime+'ms');if(translationStatus.isComplete){stableCheckCount++;if(stableCheckCount>=requiredStableChecks){pageLoading.classList.remove('active');var instantLoading=document.getElementById('gt-instant-loading');if(instantLoading){instantLoading.style.opacity='0';instantLoading.style.transition='opacity 0.3s ease';setTimeout(function(){if(instantLoading.parentNode){instantLoading.parentNode.removeChild(instantLoading)}},300)}var instantHide=document.getElementById('gt-instant-hide');if(instantHide){instantHide.remove()}if(document.documentElement){document.documentElement.style.visibility='visible';document.documentElement.style.overflow=''}if(document.body){document.body.style.visibility='visible';document.body.style.overflow=''}return}}else{stableCheckCount=0}if(elapsedTime>=maxWaitTime){pageLoading.classList.remove('active');var instantLoading=document.getElementById('gt-instant-loading');if(instantLoading){instantLoading.style.opacity='0';instantLoading.style.transition='opacity 0.3s ease';setTimeout(function(){if(instantLoading.parentNode){instantLoading.parentNode.removeChild(instantLoading)}},300)}var instantHide=document.getElementById('gt-instant-hide');if(instantHide){instantHide.remove()}if(document.documentElement){document.documentElement.style.visibility='visible';document.documentElement.style.overflow=''}if(document.body){document.body.style.visibility='visible';document.body.style.overflow=''}return}setTimeout(checkTranslationProgress,checkInterval)}setTimeout(checkTranslationProgress,checkInterval)}
         
         function getVisibleTranslatedContent(){var viewportHeight=window.innerHeight;var translatedElements=document.querySelectorAll('font[style*="vertical-align: inherit"]');var visibleHeight=0;translatedElements.forEach(function(el){var rect=el.getBoundingClientRect();if(rect.top<viewportHeight&&rect.bottom>0){visibleHeight+=Math.min(rect.bottom,viewportHeight)-Math.max(rect.top,0)}});return visibleHeight}
         
