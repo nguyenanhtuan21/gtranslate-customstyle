@@ -187,6 +187,11 @@ add_action('litespeed_cache_excludes', function($excludes) {
 
 // Object caching support
 $cached_data = wp_cache_get('gtranslate_config');
+
+// PRODUCTION CACHE ISSUE (January 2025)
+// Multiple cache layers (WP Rocket + W3 Total Cache + Cloudflare) 
+// can serve cached translated content that bypasses JavaScript translation system
+// Requires cache bypass detection and force reload mechanisms
 ```
 
 ### Database Optimization

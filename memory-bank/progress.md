@@ -103,6 +103,13 @@
 ## Known Issues 🐛
 
 ### Critical Issues
+- **Production Cache Conflict**: Plugin fails on production with multiple cache layers
+  - **Environment**: WP Rocket + W3 Total Cache + Cloudflare  
+  - **Symptom**: Works on localhost, fails on production after back button navigation
+  - **Root Cause**: Cache layers serve translated HTML but JavaScript expects original content
+  - **Status**: ACTIVE INVESTIGATION - comprehensive solution designed
+  - **Priority**: HIGH - affects production users
+
 - **White Screen Problem**: User experiencing white screen in some scenarios
   - **Status**: ACTIVE ISSUE - needs careful investigation
   - **Previous Fix**: FAILED - broke adaptive loading system

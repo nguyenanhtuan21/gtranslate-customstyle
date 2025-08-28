@@ -131,10 +131,16 @@ add_filter('litespeed_cache_exclude', function($excludes) {
     $excludes[] = 'gtranslate';
     return $excludes;
 });
+
+// PRODUCTION CACHE CONFLICT PATTERN (January 2025)
+// Issue: Multiple cache layers (WP Rocket + W3 Total Cache + Cloudflare)
+// serve cached translated HTML, but JavaScript expects original content
+// Solution: Cache conflict detection + force reload mechanism
 ```
 - **Purpose**: Prevent translation conflicts với caching
 - **Benefits**: Reliable translation functionality
 - **Support**: Major caching plugins compatibility
+- **Challenge**: Production environments với multiple cache layers require special handling
 
 ## Security Patterns
 

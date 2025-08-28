@@ -2,6 +2,14 @@
 
 ## Current Work Focus
 
+### Production Cache Conflict Issue (January 2025)
+- **Status**: 🔍 ACTIVE INVESTIGATION
+- **Issue**: Plugin works perfectly on localhost but fails on production with cache layers
+- **Environment**: WP Rocket + W3 Total Cache + Cloudflare
+- **Symptom**: Cookie correct, dropdown correct, but content not translating after back button
+- **Root Cause**: Cache layers serving cached content that bypasses translation system
+- **Priority**: HIGH - affects production users
+
 ### White Screen Issue Resolution (January 2025)
 - **Status**: ❌ FAILED - CODE REVERTED
 - **Issue**: Attempted to fix white screen problem but broke existing functionality
@@ -87,7 +95,14 @@
 ## Current Challenges
 
 ### Critical Issues
-1. **White Screen Problem**: User experiencing white screen after applying recent fixes
+1. **Production Cache Conflict**: Plugin fails on production with multiple cache layers
+   - **Environment**: WP Rocket + W3 Total Cache + Cloudflare
+   - **Symptom**: After back button, cookie/dropdown correct but content not translating
+   - **Cause**: Cache serves translated HTML but JavaScript expects original content to translate
+   - **Impact**: Inconsistent translation behavior on production sites
+   - **Status**: ACTIVE - solution designed, needs implementation
+
+2. **White Screen Problem**: User experiencing white screen after applying recent fixes
    - **Cause**: Over-aggressive content hiding without proper show logic
    - **Impact**: Broke existing adaptive loading system
    - **Status**: Code reverted, need careful approach to fix

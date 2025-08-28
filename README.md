@@ -77,16 +77,7 @@ html, body {
     animation: gt-instant-spin-reverse 1.5s linear infinite !important;
 }
 
-.gt-loading-text {
-    position: absolute !important;
-    bottom: -50px !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    color: #666 !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    white-space: nowrap !important;
-}
+
 
 @keyframes gt-instant-spin {
     0% { transform: rotate(0deg); }
@@ -102,7 +93,6 @@ html, body {
 <div id="gt-instant-loading">
     <div style="position: relative;">
         <div class="gt-instant-spinner"></div>
-        <div class="gt-loading-text">Đang tải...</div>
     </div>
 </div>
 ```
@@ -175,8 +165,8 @@ border-top: 4px solid #your-color !important;
 /* Thay đổi background */
 background: rgba(255, 255, 255, 0.98) !important;
 
-/* Thay đổi text loading */
-.gt-loading-text { color: #your-color !important; }
+/* Tùy chỉnh màu spinner */
+.gt-instant-spinner { border-top-color: #your-color !important; }
 ```
 
 ## 🐛 Debug & Troubleshooting
@@ -259,6 +249,27 @@ function detectUserLanguage() {
 ```
 
 ## 📝 Changelog
+
+### Version 1.3.0 - UI Enhancement & Clean Loading (NEW!) 🎨
+
+**🎨 Custom Dropdown Styling:**
+- ✅ **Modern Dropdown Design**: Bỏ viền default, clean appearance
+- ✅ **Globe Icon Integration**: Custom SVG globe icon bên phải dropdown
+- ✅ **No Hover Effects**: Bỏ tất cả hover/focus/active effects
+- ✅ **Consistent Styling**: Áp dụng cho tất cả dropdown widgets (dropdown.js, fd.js)
+- ✅ **Responsive Design**: Tương thích với mọi screen size
+
+**🔄 Clean Loading Experience:**
+- ✅ **Spinner Only**: Bỏ loading text "Đang chuyển trang..." và "Đang tải..."
+- ✅ **Minimalist Loading**: Chỉ giữ spinner animation cho clean UX
+- ✅ **Updated Documentation**: Cập nhật README với styling mới
+- ✅ **Consistent Implementation**: Áp dụng cho tất cả loading states
+
+**🎯 Technical Details:**
+- Custom CSS với `appearance: none` để bỏ default styling
+- SVG icon embedded trực tiếp vào CSS (không cần external files)
+- Background positioning chính xác cho icon placement
+- Removed `.gt-loading-text` CSS và HTML references
 
 ### Version 1.2.0 - Adaptive Loading System (NEW!) 🧠
 

@@ -712,7 +712,7 @@ if (document.readyState === 'loading') {
     widget_css += ".gt-nav-indicator{position:fixed;top:0;left:0;width:100%;height:3px;background:linear-gradient(90deg,transparent,#4f46e5,transparent);z-index:999998;display:none;animation:gt-nav-progress 1.5s ease-in-out infinite}.gt-navigating .gt-nav-indicator{display:block}";
     
     // Instant loading spinner for navigation (same style as header loading)
-    widget_css += ".gt-instant-spinner{width:60px!important;height:60px!important;border:4px solid rgba(0,0,0,0.1)!important;border-top:4px solid #4f46e5!important;border-radius:50%!important;animation:gt-instant-spin 1s linear infinite!important;position:relative!important}.gt-instant-spinner::after{content:''!important;position:absolute!important;top:-4px!important;left:-4px!important;right:-4px!important;bottom:-4px!important;border:2px solid transparent!important;border-top:2px solid rgba(79,70,229,0.3)!important;border-radius:50%!important;animation:gt-instant-spin-reverse 1.5s linear infinite!important}.gt-loading-text{position:absolute!important;bottom:-50px!important;left:50%!important;transform:translateX(-50%)!important;color:#666!important;font-size:14px!important;font-weight:500!important;white-space:nowrap!important}";
+    widget_css += ".gt-instant-spinner{width:60px!important;height:60px!important;border:4px solid rgba(0,0,0,0.1)!important;border-top:4px solid #4f46e5!important;border-radius:50%!important;animation:gt-instant-spin 1s linear infinite!important;position:relative!important}.gt-instant-spinner::after{content:''!important;position:absolute!important;top:-4px!important;left:-4px!important;right:-4px!important;bottom:-4px!important;border:2px solid transparent!important;border-top:2px solid rgba(79,70,229,0.3)!important;border-radius:50%!important;animation:gt-instant-spin-reverse 1.5s linear infinite!important}";
     
     // Keyframe animations
     widget_css += "@keyframes gt-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}@keyframes gt-spin-reverse{0%{transform:rotate(360deg)}100%{transform:rotate(0deg)}}@keyframes gt-nav-progress{0%{transform:translateX(-100%)}50%{transform:translateX(0%)}100%{transform:translateX(100%)}}@keyframes gt-instant-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}@keyframes gt-instant-spin-reverse{0%{transform:rotate(360deg)}100%{transform:rotate(0deg)}}";
@@ -997,7 +997,7 @@ if (document.readyState === 'loading') {
                         var instantLoading = document.getElementById('gt-instant-loading');
                         if (!instantLoading) {
                             // Create instant loading if not exists
-                            var loadingHTML = '<div id="gt-instant-loading"><div style="position: relative;"><div class="gt-instant-spinner"></div><div class="gt-loading-text">Đang chuyển trang...</div></div></div>';
+                            var loadingHTML = '<div id="gt-instant-loading"><div style="position: relative;"><div class="gt-instant-spinner"></div></div></div>';
                             document.body.insertAdjacentHTML('afterbegin', loadingHTML);
                         } else {
                             instantLoading.style.display = 'flex';
