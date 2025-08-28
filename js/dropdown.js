@@ -50,7 +50,7 @@
                 setTimeout(function() {
                     var startTime = Date.now();
                     var checkInterval = 200; // Increased interval for better stability
-                    var maxWaitTime = 8000; // Increased max wait time
+                    var maxWaitTime = 5000; // Increased max wait time
                     var minWaitTime = 1000; // Increased minimum wait time
                     var stableCheckCount = 0; // Count stable translation checks
                     var requiredStableChecks = 3; // Require 3 stable checks before hiding
@@ -324,79 +324,153 @@
     window.checkDropdownTranslationComplete = checkDropdownTranslationComplete;
 })();
 
+// CONDITIONAL NAVIGATION HANDLER - Performance optimized cho 3 luồng
 (function(){
-
-    // 🚀 SIMPLE FORCE RELOAD SYSTEM - Preserves Loading Logic (Dropdown)
-    console.log('GTranslate Dropdown: 🛡️ Simple force reload system activating...');
+    var navigationReloadPending = false;
+    var navigationTimeout = null;
     
-    // CRITICAL: Show loading BEFORE reload to prevent flash
-    function showDropdownLoadingBeforeReload(reason) {
-        console.log('GTranslate Dropdown: 🔄 Showing loading before reload - Reason: ' + reason);
+    // CRITICAL: Function to check if user is using translation
+    function isUsingTranslation() {
+        // Method 1: Check cookie (fastest)
+        var cookieCheck = document.cookie.match('(^|;) ?googtrans=([^;]*)(;|$)');
+        if (cookieCheck && cookieCheck[2] && cookieCheck[2] !== '/auto/auto') {
+            var cookieLang = cookieCheck[2].split('/')[2];
+            if (cookieLang && cookieLang !== 'vi') { // Use early_default
+                return { isTranslated: true, lang: cookieLang, source: 'cookie' };
+            }
+        }
         
-        // Immediately show loading overlay
-        var loadingHTML = '<div id="gt-dropdown-reload-loading" style="position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;background:rgba(255,255,255,0.95)!important;backdrop-filter:blur(8px)!important;z-index:2147483647!important;display:flex!important;align-items:center!important;justify-content:center!important;"><div style="width:60px;height:60px;border:4px solid rgba(0,0,0,0.1);border-top:4px solid #4f46e5;border-radius:50%;animation:gt-dropdown-reload-spin 1s linear infinite;"></div><style>@keyframes gt-dropdown-reload-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}</style></div>';
-        document.body.insertAdjacentHTML('beforeend', loadingHTML);
+        // Method 2: Check sessionStorage for navigation state
+        var preserveLang = sessionStorage.getItem('gt_preserve_lang');
+        if (preserveLang && preserveLang !== 'vi') {
+            return { isTranslated: true, lang: preserveLang, source: 'session' };
+        }
         
-        // Small delay to ensure loading is visible before reload
-        setTimeout(function() {
+        // Method 3: Check for Google Translate elements (slowest, fallback)
+        if (document.querySelector('font[style*="vertical-align: inherit"]')) {
+            return { isTranslated: true, lang: 'unknown', source: 'dom' };
+        }
+        
+        return { isTranslated: false, lang: 'vi', source: 'default' };
+    }
+    
+    function showNavigationLoading() {
+        // Priority: Use header loading first
+        var instantLoading = document.getElementById('gt-instant-loading');
+        if (instantLoading) {
+            instantLoading.style.display = 'flex';
+            instantLoading.style.opacity = '1';
+            console.log('GTranslate Dropdown: Using header loading for navigation');
+            return;
+        }
+        
+        // Fallback: Use page loading
+        var pageLoading = document.getElementById('gt-page-loading');
+        if (pageLoading) {
+            pageLoading.classList.add('active');
+            console.log('GTranslate Dropdown: Using page loading for navigation');
+            return;
+        }
+        
+        // Emergency: Create lightweight loading
+        var emergencyLoading = document.createElement('div');
+        emergencyLoading.id = 'gt-emergency-nav-loading';
+        emergencyLoading.innerHTML = `
+            <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(255,255,255,0.95);z-index:999999;display:flex;align-items:center;justify-content:center">
+                <div style="width:50px;height:50px;border:3px solid rgba(0,0,0,0.1);border-top:3px solid #4f46e5;border-radius:50%;animation:gt-nav-spin 1s linear infinite"></div>
+            </div>
+            <style>@keyframes gt-nav-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}</style>
+        `;
+        document.body.appendChild(emergencyLoading);
+        console.log('GTranslate Dropdown: Created emergency navigation loading');
+    }
+    
+    function handleNavigationReload(source, event) {
+        // PERFORMANCE GATE: Chỉ proceed nếu user đang dùng translation
+        var translationState = isUsingTranslation();
+        
+        if (!translationState.isTranslated) {
+            console.log('GTranslate Dropdown: User using default language (' + 
+                       translationState.lang + ') - skipping navigation reload for performance');
+            return; // EXIT EARLY - No performance impact cho default users
+        }
+        
+        // Prevent duplicate reloads
+        if (navigationReloadPending) {
+            console.log('GTranslate Dropdown: Navigation reload already pending, skipping ' + source);
+            return;
+        }
+        
+        navigationReloadPending = true;
+        console.log('GTranslate Dropdown: Navigation reload triggered by ' + source + 
+                   ' for translated user (' + translationState.lang + ', detected via ' + translationState.source + ')');
+        
+        // Show loading IMMEDIATELY - chỉ cho translated users
+        showNavigationLoading();
+        
+        // Mark navigation state
+        sessionStorage.setItem('gt_navigating', '1');
+        sessionStorage.setItem('gt_navigation_source', source);
+        sessionStorage.setItem('gt_preserve_lang', translationState.lang);
+        sessionStorage.setItem('gt_preserve_cookie', document.cookie);
+        
+        // Clear any existing timeout
+        if (navigationTimeout) {
+            clearTimeout(navigationTimeout);
+        }
+        
+        // Reload with minimal delay để loading có thời gian hiển thị
+        navigationTimeout = setTimeout(function() {
             location.reload();
         }, 50);
     }
     
-    // Method 1: SMART reload on pageshow (with loop prevention)
+    // CONDITIONAL EVENT LISTENERS - Lightweight check first
     window.addEventListener('pageshow', function(event) {
-        console.log('GTranslate Dropdown: 📄 PAGESHOW event - persisted: ' + event.persisted);
-        
-        // CRITICAL: Only reload if page came from cache (persisted = true)
-        // This prevents infinite reload loops
         if (event.persisted) {
-            console.log('GTranslate Dropdown: Page from cache - reloading for translation consistency');
-            showDropdownLoadingBeforeReload('pageshow event (from cache)');
-        } else {
-            console.log('GTranslate Dropdown: Fresh page load - no reload needed');
+            // Quick check trước khi proceed
+            var quickCheck = document.cookie.includes('googtrans') || 
+                           sessionStorage.getItem('gt_preserve_lang');
+            
+            if (quickCheck) {
+                handleNavigationReload('pageshow-bfcache', event);
+            } else {
+                console.log('GTranslate Dropdown: bfcache detected but no translation - performance mode');
+            }
         }
     });
     
-    // Method 2: Force reload on popstate (back/forward buttons) with safeguards
     window.addEventListener('popstate', function(event) {
-        console.log('GTranslate Dropdown: ⬅️ POPSTATE event - back/forward button');
+        // Quick check trước khi proceed
+        var quickCheck = document.cookie.includes('googtrans') || 
+                       sessionStorage.getItem('gt_preserve_lang');
         
-        // Safeguard: Check if we just reloaded to prevent loops
-        var lastReload = sessionStorage.getItem('gt_dropdown_last_popstate_reload');
-        var currentTime = Date.now();
-        
-        if (lastReload && (currentTime - parseInt(lastReload)) < 2000) {
-            console.log('GTranslate Dropdown: Recent popstate reload detected - skipping to prevent loop');
-            return;
+        if (quickCheck) {
+            handleNavigationReload('popstate', event);
+        } else {
+            console.log('GTranslate Dropdown: popstate detected but no translation - performance mode');
+        }
+    });
+    
+    // Cleanup - lightweight cho tất cả users
+    window.addEventListener('beforeunload', function() {
+        navigationReloadPending = false;
+        if (navigationTimeout) {
+            clearTimeout(navigationTimeout);
+            navigationTimeout = null;
         }
         
-        sessionStorage.setItem('gt_dropdown_last_popstate_reload', currentTime.toString());
-        showDropdownLoadingBeforeReload('popstate event (back/forward)');
+        // Mark navigation state for translated users only
+        var translationState = isUsingTranslation();
+        if (translationState.isTranslated) {
+            sessionStorage.setItem('gt_navigating_from_translated', '1');
+            sessionStorage.setItem('gt_preserve_lang', translationState.lang);
+            sessionStorage.setItem('gt_preserve_cookie', document.cookie);
+        }
     });
-    
-    // Method 3: DISABLED hash changes (too aggressive, causes loops)
-    // window.addEventListener('hashchange', function(event) {
-    //     console.log('GTranslate Dropdown: 🔗 HASHCHANGE event - DISABLED to prevent loops');
-    // });
-    
-    // Method 4: Track navigation for loading system (SIMPLIFIED)
-    window.addEventListener('beforeunload', function() {
-        console.log('GTranslate Dropdown: 📤 BEFOREUNLOAD - marking navigation for loading system only');
-        // ONLY preserve for original loading system, NOT for force reload
-        sessionStorage.setItem('gt_navigating', '1');
-        // REMOVED: sessionStorage.setItem('gt_dropdown_force_reload_time', Date.now().toString());
-    });
-    
-    // Method 5: Clean up any problematic flags from previous versions
-    var dropdownForceReloadTime = sessionStorage.getItem('gt_dropdown_force_reload_time');
-    if (dropdownForceReloadTime) {
-        console.log('GTranslate Dropdown: 🧹 Cleaning up old force reload flags');
-        sessionStorage.removeItem('gt_dropdown_force_reload_time');
-    }
-    
-    // NOTE: gt_navigating flag is preserved for original loading system
-    
-    console.log('GTranslate Dropdown: ✅ Simple force reload system activated - Loading logic preserved');
+})();
+
+(function(){
 
     var gt = window.gtranslateSettings || {};
     gt = gt[document.currentScript.getAttribute('data-gt-widget-id')] || gt;
@@ -513,13 +587,301 @@
         function get_current_lang() {var keyValue = document.cookie.match('(^|;) ?googtrans=([^;]*)(;|$)');return keyValue ? keyValue[2].split('/')[2] : null;}
         function fire_event(element,event){try{if(document.createEventObject){var evt=document.createEventObject();element.fireEvent('on'+event,evt)}else{var evt=document.createEvent('HTMLEvents');evt.initEvent(event,true,true);element.dispatchEvent(evt)}}catch(e){}}
         function load_tlib(){if(!window.gt_translate_script){window.gt_translate_script=document.createElement('script');gt_translate_script.src='https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit2';document.body.appendChild(gt_translate_script);}}
-        function startContentMonitoring(){var pageLoading=document.getElementById('gt-page-loading');if(!pageLoading)return;var startTime=Date.now();var checkInterval=200;var maxWaitTime=8000;var minWaitTime=1000;var stableCheckCount=0;var requiredStableChecks=3;function checkTranslationProgress(){var currentTime=Date.now();var elapsedTime=currentTime-startTime;if(elapsedTime<minWaitTime){setTimeout(checkTranslationProgress,checkInterval);return}var translationStatus=window.checkDropdownTranslationComplete();console.log('GTranslate Dropdown: Content monitoring - Elements:'+translationStatus.translatedElements+', Progress:'+Math.round(translationStatus.progress*100)+'%, Time:'+elapsedTime+'ms');if(translationStatus.isComplete){stableCheckCount++;if(stableCheckCount>=requiredStableChecks){pageLoading.classList.remove('active');var instantLoading=document.getElementById('gt-instant-loading');if(instantLoading){instantLoading.style.opacity='0';instantLoading.style.transition='opacity 0.3s ease';setTimeout(function(){if(instantLoading.parentNode){instantLoading.parentNode.removeChild(instantLoading)}},300)}var instantHide=document.getElementById('gt-instant-hide');if(instantHide){instantHide.remove()}if(document.documentElement){document.documentElement.style.visibility='visible';document.documentElement.style.overflow=''}if(document.body){document.body.style.visibility='visible';document.body.style.overflow=''}return}}else{stableCheckCount=0}if(elapsedTime>=maxWaitTime){pageLoading.classList.remove('active');var instantLoading=document.getElementById('gt-instant-loading');if(instantLoading){instantLoading.style.opacity='0';instantLoading.style.transition='opacity 0.3s ease';setTimeout(function(){if(instantLoading.parentNode){instantLoading.parentNode.removeChild(instantLoading)}},300)}var instantHide=document.getElementById('gt-instant-hide');if(instantHide){instantHide.remove()}if(document.documentElement){document.documentElement.style.visibility='visible';document.documentElement.style.overflow=''}if(document.body){document.body.style.visibility='visible';document.body.style.overflow=''}return}setTimeout(checkTranslationProgress,checkInterval)}setTimeout(checkTranslationProgress,checkInterval)}
+        
+        function startContentMonitoring(){
+            // FALLBACK: Dùng gt-instant-loading HOẶC gt-page-loading
+            var instantLoading = document.getElementById('gt-instant-loading');
+            var pageLoading = document.getElementById('gt-page-loading');
+            
+            // Nếu không có loading nào thì return
+            if(!instantLoading && !pageLoading) {
+                console.log('GTranslate Dropdown: No loading elements found - skipping monitoring');
+                return;
+            }
+            
+            var startTime = Date.now();
+            var checkInterval = 100; // Tăng frequency
+            
+            // NETWORK DETECTION - Chỉ slow 4G trở lên
+            var baseTimeout = 3000;
+            var slowTimeout = 6000; // Cho slow 4G
+            var maxWaitTime = baseTimeout;
+            
+            var connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+            if(connection) {
+                if(connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g' || connection.effectiveType === '3g') {
+                    // Bỏ qua 2G/3G - chỉ dùng base timeout
+                    maxWaitTime = baseTimeout;
+                    console.log('GTranslate Dropdown: 2G/3G detected - using base timeout: ' + maxWaitTime + 'ms');
+                } else if(connection.downlink && connection.downlink < 2) {
+                    // Slow 4G detection based on downlink speed
+                    maxWaitTime = slowTimeout;
+                    checkInterval = 150;
+                    console.log('GTranslate Dropdown: Slow 4G detected - extended timeout: ' + maxWaitTime + 'ms');
+                }
+            }
+            
+            // Fallback: Detect slow loading từ page performance
+            if(performance && performance.timing) {
+                var pageLoadTime = performance.timing.loadEventEnd - performance.timing.navigationStart;
+                if(pageLoadTime > 3000) { // Page load > 3s = slow network
+                    maxWaitTime = slowTimeout;
+                    console.log('GTranslate Dropdown: Slow page load detected (' + pageLoadTime + 'ms) - extending timeout');
+                }
+            }
+            
+            var minWaitTime = 200; // Giảm min wait
+            var stableCheckCount = 0;
+            var requiredStableChecks = 1; // Chỉ cần 1 lần check
+            var progressiveTimeout = false;
+            
+            function checkTranslationProgress(){
+                var currentTime = Date.now();
+                var elapsedTime = currentTime - startTime;
+                
+                if(elapsedTime < minWaitTime) {
+                    setTimeout(checkTranslationProgress, checkInterval);
+                    return;
+                }
+                
+                // SIMPLIFIED DETECTION
+                var translatedElements = document.querySelectorAll('font[style*="vertical-align: inherit"]');
+                var googleTranslateLoaded = document.querySelector('.goog-te-combo') !== null;
+                var googleTranslateScript = document.querySelector('script[src*="translate.google.com"]') !== null;
+                
+                // Multiple completion criteria với fallbacks
+                var basicComplete = translatedElements.length > 0 && googleTranslateLoaded;
+                var hasGoogleElements = document.querySelector('.goog-te-banner-frame') !== null || 
+                                       document.querySelector('#google_translate_element2') !== null;
+                
+                var isComplete = basicComplete || (googleTranslateScript && hasGoogleElements);
+                
+                console.log('GTranslate Dropdown: Elements:' + translatedElements.length + 
+                           ', GoogleLoaded:' + googleTranslateLoaded + 
+                           ', HasElements:' + hasGoogleElements +
+                           ', Time:' + elapsedTime + 'ms');
+                
+                if(isComplete) {
+                    stableCheckCount++;
+                    if(stableCheckCount >= requiredStableChecks) {
+                        hideInstantLoading();
+                        return;
+                    }
+                } else {
+                    stableCheckCount = 0;
+                    
+                    // PROGRESSIVE TIMEOUT - chỉ cho slow 4G
+                    if(elapsedTime > (maxWaitTime * 0.7) && !progressiveTimeout && connection && connection.downlink < 2) {
+                        if(googleTranslateScript && !googleTranslateLoaded) {
+                            maxWaitTime += 3000; // Thêm 3s cho slow 4G
+                            progressiveTimeout = true;
+                            console.log('GTranslate Dropdown: Slow 4G script loading - extending timeout to ' + maxWaitTime + 'ms');
+                        }
+                    }
+                }
+                
+                // Final timeout
+                if(elapsedTime >= maxWaitTime) {
+                    console.log('GTranslate Dropdown: Timeout reached (' + maxWaitTime + 'ms) - showing content');
+                    hideInstantLoading();
+                    return;
+                }
+                
+                setTimeout(checkTranslationProgress, checkInterval);
+            }
+            
+            function hideInstantLoading() {
+                // Ẩn TẤT CẢ loading elements
+                var instantLoading = document.getElementById('gt-instant-loading');
+                if(instantLoading) {
+                    instantLoading.style.opacity = '0';
+                    instantLoading.style.transition = 'opacity 0.3s ease';
+                    setTimeout(function(){
+                        if(instantLoading.parentNode) {
+                            instantLoading.parentNode.removeChild(instantLoading);
+                        }
+                    }, 300);
+                    console.log('GTranslate Dropdown: Removed gt-instant-loading');
+                }
+                
+                // CRITICAL: Cũng ẩn gt-page-loading
+                var pageLoading = document.getElementById('gt-page-loading');
+                if(pageLoading) {
+                    pageLoading.classList.remove('active');
+                    console.log('GTranslate Dropdown: Hidden gt-page-loading');
+                }
+                
+                var instantHide = document.getElementById('gt-instant-hide');
+                if(instantHide) {
+                    instantHide.remove();
+                }
+                
+                // Show content
+                if(document.documentElement) {
+                    document.documentElement.style.visibility = 'visible';
+                    document.documentElement.style.overflow = '';
+                }
+                if(document.body) {
+                    document.body.style.visibility = 'visible';
+                    document.body.style.overflow = '';
+                }
+            }
+            
+            setTimeout(checkTranslationProgress, checkInterval);
+        }
         
         function getVisibleTranslatedContent(){var viewportHeight=window.innerHeight;var translatedElements=document.querySelectorAll('font[style*="vertical-align: inherit"]');var visibleHeight=0;translatedElements.forEach(function(el){var rect=el.getBoundingClientRect();if(rect.top<viewportHeight&&rect.bottom>0){visibleHeight+=Math.min(rect.bottom,viewportHeight)-Math.max(rect.top,0)}});return visibleHeight}
         
-        window.doGTranslate = function(lang_pair){if(lang_pair.value)lang_pair=lang_pair.value;if(lang_pair=='')return;var lang=lang_pair.split('|')[1];if(get_current_lang() == null && lang == lang_pair.split('|')[0])return;var pageLoading=document.getElementById('gt-page-loading');if(pageLoading)pageLoading.classList.add('active');var teCombo;var sel=document.getElementsByTagName('select');for(var i=0;i<sel.length;i++)if(sel[i].className.indexOf('goog-te-combo')!=-1){teCombo=sel[i];break;}if(document.getElementById('google_translate_element2')==null||document.getElementById('google_translate_element2').innerHTML.length==0||teCombo.length==0||teCombo.innerHTML.length==0){setTimeout(function(){doGTranslate(lang_pair)},500)}else{teCombo.value=lang;fire_event(teCombo,'change');fire_event(teCombo,'change');startContentMonitoring()}}
+        // LUỒNG 1: Language Selection (Vi → En)
+        window.doGTranslate = function(lang_pair){
+            if(lang_pair.value)lang_pair=lang_pair.value;
+            if(lang_pair=='')return;
+            var lang=lang_pair.split('|')[1];
+            if(get_current_lang() == null && lang == lang_pair.split('|')[0])return;
+            
+            // Show loading ngay khi user chọn language
+            var pageLoading=document.getElementById('gt-page-loading');
+            if(pageLoading)pageLoading.classList.add('active');
+            
+            var instantLoading = document.getElementById('gt-instant-loading');
+            if(instantLoading) {
+                instantLoading.style.display = 'flex';
+                instantLoading.style.opacity = '1';
+            }
+            
+            var teCombo;var sel=document.getElementsByTagName('select');
+            for(var i=0;i<sel.length;i++)if(sel[i].className.indexOf('goog-te-combo')!=-1){teCombo=sel[i];break;}
+            if(document.getElementById('google_translate_element2')==null||document.getElementById('google_translate_element2').innerHTML.length==0||teCombo.length==0||teCombo.innerHTML.length==0){
+                setTimeout(function(){doGTranslate(lang_pair)},500)
+            }else{
+                teCombo.value=lang;
+                fire_event(teCombo,'change');
+                fire_event(teCombo,'change');
+                startContentMonitoring()
+            }
+        }
 
         window.googleTranslateElementInit2=function(){new google.translate.TranslateElement({pageLanguage:default_language,autoDisplay:false},'google_translate_element2')};
+
+        // LUỒNG 2: Navigation Interceptor (Internal Links)
+        function setupNavigationInterceptor() {
+            document.addEventListener('click', function(e) {
+                var link = e.target.closest('a');
+                if(!link) return;
+                
+                // Check if it's internal link and not language selector
+                var href = link.getAttribute('href');
+                if(!href) return;
+                
+                var isInternal = href.startsWith('/') || href.startsWith(window.location.origin) || (!href.includes('://'));
+                var isLanguageSelector = link.hasAttribute('data-gt-lang') || link.classList.contains('glink') || link.classList.contains('gtranslate') || link.closest('.gtranslate_wrapper');
+                var isExternal = href.startsWith('http') && !href.startsWith(window.location.origin);
+                var isAnchor = href.startsWith('#');
+                var isMailto = href.startsWith('mailto:') || href.startsWith('tel:');
+                
+                if(isInternal && !isLanguageSelector && !isExternal && !isAnchor && !isMailto) {
+                    var current_translated_lang = get_current_lang();
+                    
+                    // LUỒNG 2: Chỉ intercept nếu user đang ở translated language
+                    if(current_translated_lang && current_translated_lang !== default_language) {
+                        e.preventDefault();
+                        
+                        console.log('GTranslate Dropdown: Intercepting navigation to maintain translation state: ' + current_translated_lang);
+                        
+                        // Show loading IMMEDIATELY
+                        var instantLoading = document.getElementById('gt-instant-loading');
+                        if (!instantLoading) {
+                            // Create instant loading if not exists
+                            var loadingHTML = '<div id="gt-instant-loading"><div style="position: relative;"><div style="width:50px;height:50px;border:3px solid rgba(0,0,0,0.1);border-top:3px solid #4f46e5;border-radius:50%;animation:gt-nav-spin 1s linear infinite"></div><div style="position:absolute;bottom:-30px;left:50%;transform:translateX(-50%);color:#666;font-size:12px;white-space:nowrap">Đang chuyển trang...</div></div></div><style>@keyframes gt-nav-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}#gt-instant-loading{position:fixed!important;top:0!important;left:0!important;width:100%!important;height:100%!important;background:rgba(255,255,255,0.95)!important;z-index:999999!important;display:flex!important;align-items:center!important;justify-content:center!important}</style>';
+                            document.body.insertAdjacentHTML('afterbegin', loadingHTML);
+                        } else {
+                            instantLoading.style.display = 'flex';
+                            instantLoading.style.opacity = '1';
+                        }
+                        
+                        // Show regular loading
+                        var pageLoading = document.getElementById('gt-page-loading');
+                        if(pageLoading) {
+                            pageLoading.classList.add('active');
+                        }
+                        
+                        // CRITICAL: Store current language AND cookie for next page
+                        sessionStorage.setItem('gt_preserve_lang', current_translated_lang);
+                        sessionStorage.setItem('gt_navigating_from_translated', '1');
+                        sessionStorage.setItem('gt_preserve_cookie', document.cookie);
+                        
+                        console.log('GTranslate Dropdown: Stored navigation data - Lang: ' + current_translated_lang + ', Cookie: ' + document.cookie);
+                        
+                        // Navigate after short delay to show loading
+                        setTimeout(function() {
+                            window.location.href = href;
+                        }, 50);
+                    }
+                    // Else: Default language users - no interception, natural navigation
+                }
+            }, true); // Use capture phase for better interception
+        }
+
+        // Enhanced page initialization for translated state
+        function initializeTranslatedPage() {
+            var preserveLang = sessionStorage.getItem('gt_preserve_lang');
+            var wasNavigating = sessionStorage.getItem('gt_navigating_from_translated');
+            var preserveCookie = sessionStorage.getItem('gt_preserve_cookie');
+            
+            if(preserveLang && wasNavigating) {
+                console.log('GTranslate Dropdown: Restoring translation state after navigation: ' + preserveLang);
+                console.log('GTranslate Dropdown: Preserved cookie: ' + preserveCookie);
+                
+                // CRITICAL: Restore cookie first if it was lost
+                if (preserveCookie && !document.cookie.includes('googtrans')) {
+                    console.log('GTranslate Dropdown: Cookie lost during navigation - restoring...');
+                    // Extract googtrans cookie from preserved cookie string
+                    var cookieMatch = preserveCookie.match(/googtrans=([^;]*)/);
+                    if (cookieMatch) {
+                        document.cookie = 'googtrans=' + cookieMatch[1] + '; path=/';
+                        console.log('GTranslate Dropdown: Cookie restored: googtrans=' + cookieMatch[1]);
+                    }
+                }
+                
+                // Clear session flags
+                sessionStorage.removeItem('gt_preserve_lang');
+                sessionStorage.removeItem('gt_navigating_from_translated');
+                sessionStorage.removeItem('gt_preserve_cookie');
+                
+                // Ensure loading is shown
+                var pageLoading = document.getElementById('gt-page-loading');
+                if(pageLoading) {
+                    pageLoading.classList.add('active');
+                }
+                
+                // Apply translation immediately
+                load_tlib();
+                window.gt_translate_script.onload = function() {
+                    setTimeout(function() {
+                        console.log('GTranslate Dropdown: Applying preserved translation: ' + default_language + '|' + preserveLang);
+                        doGTranslate(default_language + '|' + preserveLang);
+                        
+                        // Update language selector UI
+                        var selector = document.querySelector(u_class+' .gt_selector');
+                        if(selector) {
+                            selector.value = default_language + '|' + preserveLang;
+                        }
+                    }, 100);
+                };
+            } else if(current_lang != default_language) {
+                // Show loading for existing translation from cookie
+                console.log('GTranslate Dropdown: Found existing translation from cookie: ' + current_lang);
+                var pageLoading = document.getElementById('gt-page-loading');
+                if(pageLoading) pageLoading.classList.add('active');
+                load_tlib();
+            } else {
+                document.querySelectorAll(u_class).forEach(function(e){e.addEventListener('pointerenter',load_tlib)});
+            }
+        }
+
+        // Initialize navigation interceptor and page state
+        setupNavigationInterceptor();
+        initializeTranslatedPage();
 
         if(current_lang != default_language)
             load_tlib();
@@ -528,9 +890,15 @@
     }
 
     document.querySelectorAll(u_class+' .gt_selector').forEach(function(e){e.addEventListener('change', function(evt){
-        // Show spinner loading
+        // LUỒNG 1: Show loading khi user chọn language
         var pageLoading = document.getElementById('gt-page-loading');
         if(pageLoading) pageLoading.classList.add('active');
+        
+        var instantLoading = document.getElementById('gt-instant-loading');
+        if(instantLoading) {
+            instantLoading.style.display = 'flex';
+            instantLoading.style.opacity = '1';
+        }
         
         if(url_structure == 'none')
             doGTranslate(evt.target.value);
